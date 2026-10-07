@@ -1,101 +1,52 @@
-# RENTORA - Find a place you can call home.
+# RENTORA
 
-**RENTORA** is a full-stack web application for an online house rental platform. It provides tailored experiences for Tenants, Landlords, and Administrators.
+เว็บค้นหาและปล่อยเช่าที่พัก ใช้ Supabase Auth/Postgres/Storage และ deploy เว็บพร้อม API บน Railway
 
-## Project Overview
+## ตั้งค่า Supabase
 
-This project is built using modern web development practices with a focus on UI/UX, responsive design, and robust backend architecture.
+1. สร้างโปรเจกต์ Supabase แล้วเก็บ Project URL, publishable/anon key และ secret/service-role key ไว้เป็นความลับ
+2. ไปที่ **Authentication → Providers → Email** แล้วเปิดการยืนยันอีเมล
+3. เปิด **SQL Editor** แล้วรัน `supabase/migrations/202610060001_initial.sql` ทั้งไฟล์ เพื่อสร้างตาราง, Row Level Security, Storage buckets และ RPC
+4. ไปที่ **Authentication → Providers → Phone** เปิดใช้ Phone Auth และตั้งค่า SMS provider พร้อมข้อมูลบัญชีผู้ให้บริการส่ง SMS จากนั้นเปิดการยืนยันเบอร์โทรศัพท์ การยืนยัน SMS ต้องตั้งค่าก่อนปุ่มส่ง OTP ในเว็บจะทำงาน
 
-### Features
+ก่อนส่งอีเมลสมัคร ให้ตั้งค่า SMTP สำหรับใช้งานจริงใน Supabase; ผู้ส่งอีเมลเริ่มต้นมีโควตาจำกัด ห้ามใส่รหัสผ่านหรือ secret key ลงในโค้ด, SQL, Git หรือแชท
+การส่ง OTP มีค่าใช้จ่ายตามผู้ให้บริการ SMS และข้อจำกัดอัตราการส่งของ Supabase; ตั้งค่า CAPTCHA/ข้อจำกัดการส่ง OTP ตามความเหมาะสมก่อนเปิดรับผู้ใช้จริง
 
-- **Role-Based Access Control**: Separate dashboards and functionalities for Tenants, Landlords, and Admins.
-- **Advanced Search & Filtering**: Find properties by location, type, price, and amenities.
-- **Property Management**: Landlords can list, edit, and manage their properties.
-- **Rental Requests**: Tenants can send requests; landlords can approve or reject them.
-- **Favorites & Reviews**: Save favorite properties and leave reviews after renting.
-- **Messaging & Notifications**: Built-in chat system and notifications for seamless communication.
-- **Admin Oversight**: Administrators can monitor users, properties, and overall system health.
+## Deploy บน Railway
 
-## Tech Stack
+1. Push โฟลเดอร์นี้ไปยัง GitHub repository แล้วสร้าง Railway service จาก repository นั้น
+2. กำหนดตัวแปรในหน้า **Service → Variables** ของ Railway:
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY` (ใช้ publishable key หรือ anon key ของโปรเจกต์)
+   - `SUPABASE_SECRET_KEY` (ใช้ secret key หรือ service-role key; เก็บไว้ฝั่ง Railway เท่านั้น)
+3. ให้ Railway ใช้คำสั่งเริ่มต้น `npm start` แล้วสร้าง public domain ให้ service
+4. นำ public domain ที่ได้ไปตั้งเป็น Supabase **Site URL** และเพิ่มใน **Redirect URLs** เช่น `https://your-app.up.railway.app/**` เพิ่ม `http://localhost:3000/**` หากพัฒนาบนเครื่อง
+5. สมัครผ่านหน้าเว็บด้วย `akkaphon.a17@gmail.com` แล้วยืนยันอีเมล จากนั้นรัน `supabase/bootstrap_admin.sql` ใน SQL Editor และตรวจผลว่ามี role `admin`
+6. เปิด `https://<โดเมน>/api/health` เพื่อตรวจว่า API ตอบ `ok: true`, `configured: true` และ `database: true`
 
-- **Frontend**: Next.js 14 (App Router), React, Tailwind CSS, Lucide React
-- **Backend**: Next.js API Routes, Node.js
-- **Database**: Prisma ORM with SQLite (can be easily migrated to PostgreSQL)
-- **Authentication**: NextAuth.js with Credentials Provider (bcryptjs for password hashing)
-- **Forms & Validation**: React Hook Form, Zod
+รหัสผ่าน Admin ที่ส่งมาในแชทไม่ได้ถูกบันทึกหรือฝังในโค้ด ให้ตั้งรหัสผ่านใหม่เมื่อสมัครก่อนเปิดใช้งานจริง
 
-## Installation & Setup
+## พัฒนาบนเครื่อง
 
-> **Note:** You must have Node.js and npm (or yarn/pnpm) installed on your system to run this project.
-
-1. **Clone the repository / Navigate to the folder**
-   ```bash
-   cd rentora
-   ```
-
-2. **Install Dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Environment Variables**
-   Create a `.env` file in the root directory based on `.env.example`:
-   ```env
-   DATABASE_URL="file:./dev.db"
-   NEXTAUTH_SECRET="your-super-secret-key-change-in-production"
-   NEXTAUTH_URL="http://localhost:3000"
-   ```
-
-4. **Database Setup**
-   Initialize the database and run migrations:
-   ```bash
-   npx prisma generate
-   npx prisma db push
-   ```
-
-5. **Seed Data**
-   *(Optional)* Run a seed script to populate demo accounts and sample properties:
-   ```bash
-   npx prisma db seed
-   ```
-
-6. **Run the Development Server**
-   ```bash
-   npm run dev
-   ```
-   Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-## Demo Accounts
-
-If you use the seed script, the following demo accounts will be available:
-
-- **Tenant**: `tenant@rentora.demo` / `password123`
-- **Landlord**: `landlord@rentora.demo` / `password123`
-- **Admin**: `admin@rentora.demo` / `password123`
-
-## Project Structure
-
-```
-rentora/
-├── prisma/
-│   └── schema.prisma      # Database models and relations
-├── src/
-│   ├── app/               # Next.js App Router pages and API routes
-│   │   ├── api/           # Backend endpoints
-│   │   ├── dashboard/     # Role-based dashboards
-│   │   ├── properties/    # Property listing and details
-│   │   ├── login/         # Authentication pages
-│   │   └── globals.css    # Global Tailwind styles
-│   ├── components/        # Reusable React components (Navbar, Cards, etc.)
-│   ├── lib/               # Utility functions, Prisma client setup
-│   └── types/             # TypeScript type definitions
-├── .env.example           # Example environment variables
-├── tailwind.config.ts     # Tailwind CSS configuration
-└── package.json           # Project dependencies and scripts
+```sh
+npm install
 ```
 
-## Future Improvements & API Integrations
+คัดลอก `.env.example` เป็น `.env` แล้วใส่ค่าจริง จากนั้นรัน `npm run dev` เว็บจะให้บริการที่ `http://localhost:3000` เพิ่ม URL นี้ใน Supabase Redirect URLs ด้วย
 
-- **Maps Integration**: Integrate Google Maps or Mapbox API for the property details page.
-- **Image Uploads**: Implement AWS S3 or Cloudinary for handling property image uploads.
-- **Real-time Chat**: Upgrade messaging system with WebSockets (e.g., Socket.io) for real-time communication.
+## สิทธิ์และข้อมูล
+
+- สมัครสมาชิกเปิดให้ทุกคนและต้องยืนยันอีเมลก่อนเข้าสู่ระบบ
+- ทุกบัญชีใช้ได้ทั้งเช่าที่พักและลงประกาศปล่อยเช่า
+- ผู้ลงประกาศต้องยืนยันเบอร์ผ่าน OTP ก่อนสร้างประกาศ โดยเบอร์ที่ยืนยันจะใช้เป็นเบอร์ติดต่อในประกาศ
+- ประกาศใหม่จะถูกซ่อนจากผู้เช่าจนกว่าเจ้าของจะส่งเอกสารสิทธิ์หรือหนังสือมอบอำนาจ และ Admin อนุมัติจากคิวตรวจสอบ
+- เอกสารตรวจสอบอยู่ใน Supabase Storage แบบ private; เจ้าของเข้าถึงไฟล์ของตนเองได้ และ Admin เปิดตรวจผ่านลิงก์อายุ 5 นาทีได้ เจ้าของแก้ไขข้อมูลสำคัญของประกาศแล้วต้องส่งเอกสารให้ตรวจใหม่
+- Admin ปฏิเสธได้พร้อมเหตุผล และเจ้าของส่งเอกสารใหม่ได้ภายหลัง; การอนุมัติเป็นการตรวจเอกสารตามกระบวนการของแพลตฟอร์ม ไม่ใช่การตรวจสถานที่
+- RLS จำกัดข้อมูลโปรไฟล์ คำขอเช่า และแชทตามผู้เกี่ยวข้อง
+- Admin จัดการบัญชีและประกาศผ่าน API ที่ตรวจ session และ role ฝั่งเซิร์ฟเวอร์ การลบถาวรต้องพิมพ์ `DELETE` ยืนยัน
+- ค่า `SUPABASE_SECRET_KEY` ใช้เฉพาะใน `server.js` และห้ามส่งให้ browser
+- รูปประกาศและรูปโปรไฟล์บันทึกใน Supabase Storage
+- เอกสารสิทธิ์อาจมีข้อมูลส่วนบุคคลอ่อนไหว ควรกำหนดผู้ดูแลที่เข้าถึงได้และระยะเวลาเก็บรักษาก่อนเปิดใช้งานจริง; ไฟล์จะถูกลบเมื่อ Admin ลบประกาศหรือบัญชีถาวร
+
+ข้อมูลตัวอย่างที่เคยอยู่ใน localStorage ไม่ถูกนำเข้ามาในฐานข้อมูลโดยอัตโนมัติ
+การยืนยันตัวตนภายนอกและการตรวจสถานที่ยังไม่รวมในรุ่นนี้ วางไว้เพิ่มเมื่อจำนวนผู้ใช้มากขึ้น

@@ -1,0 +1,2568 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RENTORA - แพลตฟอร์มค้นหาและให้เช่าที่พักอาศัยพร้อมระบบแชทส่วนตัว</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Prompt -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Prompt', sans-serif; }
+        /* Custom Scrollbar for Chat Box */
+        .chat-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .chat-scroll::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .chat-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .chat-scroll::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 flex flex-col min-h-screen">
+
+    <!-- Header / Navigation Bar -->
+    <header class="bg-white shadow-sm sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="showSection('search-section')">
+                <div class="bg-indigo-600 text-white p-2 rounded-lg font-bold text-xl flex items-center justify-center">
+                    <i class="fa-solid fa-house-user"></i>
+                </div>
+                <span class="text-2xl font-bold text-indigo-600 tracking-tight">RENTORA</span>
+            </div>
+
+            <!-- Dynamic Navigation Links based on User Role -->
+            <nav class="hidden md:flex space-x-6 text-sm font-medium items-center">
+                <button onclick="showSection('search-section')" class="hover:text-indigo-600 transition flex items-center space-x-1">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <span>ค้นหาที่พัก</span>
+                </button>
+                <button onclick="showSection('tenant-dashboard')" id="nav-tenant" class="hidden hover:text-indigo-600 transition flex items-center space-x-1">
+                    <i class="fa-solid fa-list-check"></i>
+                    <span>แดชบอร์ดผู้เช่า</span>
+                </button>
+                <button onclick="showSection('landlord-dashboard')" id="nav-landlord" class="hidden hover:text-indigo-600 transition flex items-center space-x-1">
+                    <i class="fa-solid fa-house-chimney-user"></i>
+                    <span>แดชบอร์ดเจ้าของบ้าน</span>
+                </button>
+                <button onclick="showSection('admin-dashboard')" id="nav-admin" class="hidden text-rose-700 hover:text-rose-800 transition flex items-center space-x-1 font-semibold">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>Admin</span>
+                </button>
+
+                <!-- Navigation Item: Private LINE-style Chat System -->
+                <button onclick="showSection('chat-section')" id="nav-chat" class="hidden hover:text-indigo-600 transition relative flex items-center space-x-1 font-semibold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-100">
+                    <i class="fa-solid fa-comments text-base"></i>
+                    <span>กล่องข้อความ / แชท</span>
+                    <span id="unread-chat-badge" class="hidden absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-white animate-pulse">0</span>
+                </button>
+
+                <button onclick="openAddPropertyModal()" id="nav-add-property" class="hidden bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg transition flex items-center space-x-1 shadow-sm">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>ลงประกาศเช่า</span>
+                </button>
+            </nav>
+
+            <div class="flex items-center space-x-3" id="auth-buttons">
+                <!-- Logged Out State -->
+                <button onclick="openModal('login-modal')" class="text-sm font-medium text-gray-700 hover:text-indigo-600 px-3 py-2">เข้าสู่ระบบ</button>
+                <button onclick="openModal('register-modal')" class="text-sm font-medium bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition shadow-sm">สมัครสมาชิก</button>
+            </div>
+
+            <div class="hidden items-center space-x-3" id="user-profile">
+                <!-- Logged In State: Clickable User Profile Badge -->
+                <button onclick="showSection('profile-section')" title="คลิกเพื่อไปที่หน้าโปรไฟล์ของคุณ" class="flex items-center space-x-2.5 text-sm text-gray-700 hover:bg-indigo-50/80 px-2.5 py-1.5 rounded-xl border border-transparent hover:border-indigo-100 transition group">
+                    <div class="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm ring-2 ring-indigo-200 group-hover:ring-indigo-500 overflow-hidden shadow-sm" id="header-avatar-container">
+                        <span id="header-avatar-initial">U</span>
+                    </div>
+                    <div class="text-left">
+                        <div class="flex items-center space-x-1.5">
+                            <strong id="user-display-name" class="text-sm font-bold text-gray-800 group-hover:text-indigo-600 transition">ผู้ใช้</strong>
+                            <span id="user-role-badge" class="text-[10px] font-semibold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-md">Role</span>
+                        </div>
+                        <p class="text-[11px] text-gray-400 flex items-center group-hover:text-indigo-500">
+                            <span>ดูและแก้ไขโปรไฟล์</span>
+                            <i class="fa-solid fa-chevron-right text-[9px] ml-1"></i>
+                        </p>
+                    </div>
+                </button>
+                <button onclick="logout()" class="text-sm text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-2 rounded-xl transition text-xs font-semibold flex items-center shadow-xs">
+                    <i class="fa-solid fa-right-from-bracket mr-1"></i>ออกจากระบบ
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Notification Toast Message Container -->
+    <div id="toast-message" class="hidden fixed bottom-5 right-5 bg-indigo-900 text-white text-sm px-5 py-3 rounded-2xl shadow-2xl z-50 flex items-center space-x-3 border border-indigo-700 transition-all duration-300">
+        <i class="fa-solid fa-circle-info text-indigo-400 text-lg"></i>
+        <span id="toast-text">ข้อความแจ้งเตือน</span>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- 1. SEARCH & PROPERTY LIST SECTION -->
+        <section id="search-section" class="space-y-6">
+            <!-- Hero Search Filter -->
+            <div class="bg-indigo-900 text-white rounded-2xl p-6 sm:p-10 shadow-xl bg-cover bg-center" style="background-image: linear-gradient(rgba(30, 27, 75, 0.85), rgba(30, 27, 75, 0.85)), url('https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1200&q=80');">
+                <h1 class="text-2xl sm:text-4xl font-bold mb-2">ค้นหาที่พักอาศัยที่ใช่สำหรับคุณ</h1>
+                <p class="text-indigo-200 text-sm sm:text-base mb-6">บ้าน คอนโด และทาวน์โฮมพร้อมเช่า พูดคุยกับเจ้าของบ้านได้โดยตรง</p>
+                
+                <div class="bg-white rounded-xl p-4 shadow-lg text-gray-800 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div class="lg:col-span-2">
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">ทำเลที่ตั้ง</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-location-dot absolute left-3 top-3 text-gray-400"></i>
+                            <input type="text" id="filter-location" placeholder="เช่น สุขุมวิท, สงขลา..." class="w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">ประเภทที่พัก</label>
+                        <select id="filter-type" class="w-full py-2 px-3 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <option value="">ทั้งหมด</option>
+                            <option value="บ้าน">บ้านเดี่ยว / บ้านแฝด</option>
+                            <option value="ทาวน์โฮม">ทาวน์โฮม / ทาวน์เฮาส์</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="filter-min-price" class="block text-xs font-semibold text-gray-500 mb-1">ราคาขั้นต่ำ (บาท/เดือน)</label>
+                        <input type="number" id="filter-min-price" min="0" step="1" placeholder="ไม่กำหนด" class="w-full py-2 px-3 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label for="filter-max-price" class="block text-xs font-semibold text-gray-500 mb-1">ราคาสูงสุด (บาท/เดือน)</label>
+                        <input type="number" id="filter-max-price" min="0" step="1" placeholder="ไม่กำหนด" class="w-full py-2 px-3 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="applyFilters()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-lg transition flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <span>ค้นหาที่พัก</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Property Cards Grid -->
+            <div>
+                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center justify-between">
+                    <span>รายการที่พักทั้งหมด</span>
+                    <span id="property-count" class="text-sm font-normal text-gray-500"></span>
+                </h2>
+                <div id="property-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Dynamic Property Cards -->
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. USER PROFILE SECTION -->
+        <section id="profile-section" class="hidden space-y-6">
+            <!-- Header Banner Card -->
+            <div class="bg-gradient-to-r from-indigo-700 via-indigo-800 to-slate-900 rounded-2xl shadow-md p-6 sm:p-8 text-white relative overflow-hidden">
+                <div class="absolute -right-10 -bottom-10 w-48 h-48 bg-white/5 rounded-full blur-2xl pointer-events-none"></div>
+                <div class="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-6 relative z-10">
+                    <div class="relative group">
+                        <div id="profile-avatar-large" class="w-24 h-24 rounded-2xl bg-indigo-500 text-white flex items-center justify-center font-bold text-3xl border-4 border-white/20 shadow-xl overflow-hidden">
+                            <span id="profile-initial-large">U</span>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center sm:text-left flex-1">
+                        <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                            <h1 id="profile-full-name" class="text-2xl sm:text-3xl font-bold">ชื่อผู้ใช้งาน</h1>
+                            <span id="profile-role-badge" class="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 w-fit mx-auto sm:mx-0">
+                                Role
+                            </span>
+                        </div>
+                        <p id="profile-email-text" class="text-indigo-200 text-sm mt-1">user@example.com</p>
+                        <p id="profile-joined-date" class="text-xs text-indigo-300/80 mt-2 flex items-center justify-center sm:justify-start">
+                            <i class="fa-regular fa-calendar mr-1.5"></i>สมาชิกเมื่อ มกราคม 2026
+                        </p>
+                    </div>
+
+                    <div class="flex gap-2">
+                        <button onclick="showSection('search-section')" class="bg-white/10 hover:bg-white/20 text-xs px-3 py-2 rounded-xl border border-white/20 transition">
+                            <i class="fa-solid fa-arrow-left mr-1"></i> กลับหน้าหลัก
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Summary Quick Stats -->
+            <div id="profile-stats-grid" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <!-- Dynamic Stats Cards rendered in JS based on Role -->
+            </div>
+
+            <!-- Profile Details Form & Account Management Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Left Column: Personal Information Form -->
+                <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border p-6 space-y-6">
+                    <div class="border-b pb-3 flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-gray-800 flex items-center space-x-2">
+                            <i class="fa-solid fa-user-pen text-indigo-600"></i>
+                            <span>ข้อมูลส่วนตัว (Personal Information)</span>
+                        </h2>
+                        <span class="text-xs text-gray-400">อัปเดตข้อมูลล่าสุดเพื่อการติดต่อ</span>
+                    </div>
+
+                    <form onsubmit="handleSaveProfile(event)" class="space-y-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">ชื่อ - นามสกุล *</label>
+                                <input type="text" id="prof-input-name" required class="w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">อีเมล (ใช้ระบุตัวตนระบบแชท)</label>
+                                <input type="email" id="prof-input-email" readonly class="w-full bg-gray-100 text-gray-500 border rounded-xl px-3.5 py-2 text-sm outline-none cursor-not-allowed">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">เบอร์โทรศัพท์ติดต่อ</label>
+                                <input type="tel" id="prof-input-phone" placeholder="เช่น 081-234-5678" class="w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">Line ID</label>
+                                <input type="text" id="prof-input-line" placeholder="เช่น @lineid" class="w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+                        </div>
+
+                        <div class="border border-indigo-100 bg-indigo-50/60 rounded-xl p-4 space-y-3">
+                            <div class="flex items-center justify-between gap-2">
+                                <div>
+                                    <h3 class="text-sm font-bold text-gray-800">ยืนยันเบอร์โทรศัพท์ด้วย SMS</h3>
+                                    <p class="text-xs text-gray-500 mt-1">ต้องยืนยันก่อนส่งประกาศให้ Admin ตรวจ</p>
+                                </div>
+                                <span id="phone-verification-status" class="text-xs font-semibold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full">ยังไม่ยืนยัน</span>
+                            </div>
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <input type="tel" id="verify-phone-input" placeholder="081-234-5678" onkeydown="if(event.key==='Enter'){event.preventDefault();requestPhoneVerification()}" class="flex-1 border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+                                <button type="button" onclick="requestPhoneVerification()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg px-4 py-2">ส่งรหัส SMS</button>
+                            </div>
+                            <div id="phone-otp-panel" class="hidden flex flex-col sm:flex-row gap-2">
+                                <input type="text" id="verify-phone-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmPhoneVerification()}" placeholder="รหัส OTP" class="flex-1 border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+                                <button type="button" onclick="confirmPhoneVerification()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg px-4 py-2">ยืนยันรหัส</button>
+                            </div>
+                            <p id="phone-verification-help" class="text-xs text-gray-500" aria-live="polite">กรอกรหัสประเทศได้ เช่น +66</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">รูปโปรไฟล์ / อวตารส่วนตัว</label>
+                            
+                            <!-- Profile Picture File Upload & URL Input Options -->
+                            <div class="flex flex-col sm:flex-row items-stretch gap-2 mb-2">
+                                <div class="relative flex-grow">
+                                    <input type="url" id="prof-input-avatar" placeholder="ระบุ URL รูปภาพ เช่น https://..." class="w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                </div>
+                                <label class="cursor-pointer bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl px-4 py-2 text-xs font-semibold flex items-center justify-center space-x-2 transition whitespace-nowrap shadow-xs">
+                                    <i class="fa-solid fa-cloud-arrow-up text-sm"></i>
+                                    <span>อัปโหลดรูปภาพ</span>
+                                    <input type="file" id="prof-input-file" accept="image/*" onchange="handleProfileFileSelect(event)" class="hidden">
+                                </label>
+                            </div>
+
+                            <!-- Avatar Preset Badges -->
+                            <div class="flex items-center space-x-2">
+                                <span class="text-[11px] text-gray-400">หรือเลือกสัญลักษณ์ประจำตัว:</span>
+                                <div class="flex space-x-2" id="avatar-presets">
+                                    <button type="button" onclick="setAvatarPreset('bg-indigo-600')" class="w-7 h-7 rounded-full bg-indigo-600 ring-2 ring-offset-1 ring-indigo-300"></button>
+                                    <button type="button" onclick="setAvatarPreset('bg-emerald-600')" class="w-7 h-7 rounded-full bg-emerald-600 hover:ring-2 hover:ring-offset-1 hover:ring-emerald-300"></button>
+                                    <button type="button" onclick="setAvatarPreset('bg-rose-600')" class="w-7 h-7 rounded-full bg-rose-600 hover:ring-2 hover:ring-offset-1 hover:ring-rose-300"></button>
+                                    <button type="button" onclick="setAvatarPreset('bg-amber-600')" class="w-7 h-7 rounded-full bg-amber-600 hover:ring-2 hover:ring-offset-1 hover:ring-amber-300"></button>
+                                    <button type="button" onclick="setAvatarPreset('bg-purple-600')" class="w-7 h-7 rounded-full bg-purple-600 hover:ring-2 hover:ring-offset-1 hover:ring-purple-300"></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">ข้อความแนะนำตัว / ประวัติย่อ (Bio)</label>
+                            <textarea id="prof-input-bio" rows="3" placeholder="เขียนสั้นๆ เกี่ยวกับตัวคุณ เช่น เงื่อนไขที่ต้องการ หรือข้อมูลการติดต่อเพิ่มเติม..." class="w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                        </div>
+
+                        <div class="flex justify-end pt-2">
+                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-6 py-2.5 rounded-xl transition shadow-sm flex items-center space-x-2">
+                                <i class="fa-solid fa-floppy-disk"></i>
+                                <span>บันทึกข้อมูลโปรไฟล์</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Right Column: Account Security & Dashboard Quick Action -->
+                <div class="space-y-6">
+                    <!-- Quick Navigation Card -->
+                    <div class="bg-white rounded-2xl shadow-sm border p-6">
+                        <h3 class="text-base font-bold text-gray-800 mb-3 flex items-center space-x-2">
+                            <i class="fa-solid fa-gauge-high text-indigo-600"></i>
+                            <span>ทางลัดจัดการระบบ</span>
+                        </h3>
+                        <p class="text-xs text-gray-500 mb-4">ไปยังเมนูกิจกรรมหลักตามบทบาทการใช้งานของคุณ</p>
+                        
+                        <div id="profile-role-actions">
+                            <!-- Dynamic Role Action Buttons rendered in JS -->
+                        </div>
+                    </div>
+
+                    <!-- Change Password Card -->
+                    <div class="bg-white rounded-2xl shadow-sm border p-6">
+                        <h3 class="text-base font-bold text-gray-800 mb-3 flex items-center space-x-2">
+                            <i class="fa-solid fa-shield-halved text-indigo-600"></i>
+                            <span>ความปลอดภัยของบัญชี</span>
+                        </h3>
+                        <form onsubmit="handleChangePassword(event)" class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">รหัสผ่านปัจจุบัน</label>
+                                <div class="relative">
+                                    <input type="password" id="current-password" required autocomplete="current-password" placeholder="••••••••" class="w-full border rounded-xl pl-3 pr-10 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    <button type="button" onclick="togglePasswordVisibility('current-password', this)" aria-label="แสดงรหัสผ่าน" aria-pressed="false" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600"><i class="fa-solid fa-eye"></i></button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">รหัสผ่านใหม่</label>
+                                <div class="relative">
+                                    <input type="password" id="new-password" minlength="8" required autocomplete="new-password" placeholder="อย่างน้อย 8 ตัวอักษร" class="w-full border rounded-xl pl-3 pr-10 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    <button type="button" onclick="togglePasswordVisibility('new-password', this)" aria-label="แสดงรหัสผ่าน" aria-pressed="false" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600"><i class="fa-solid fa-eye"></i></button>
+                                </div>
+                            </div>
+                            <button type="submit" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs py-2 rounded-xl transition">
+                                เปลี่ยนรหัสผ่าน
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. PRIVATE CHAT SECTION (LINE-Style 1-on-1 Messaging System) -->
+        <section id="chat-section" class="hidden h-[78vh] flex flex-col bg-white rounded-2xl border shadow-sm overflow-hidden">
+            <div class="grid grid-cols-1 md:grid-cols-3 h-full divide-y md:divide-y-0 md:divide-x">
+                
+                <!-- Left Sidebar: Conversation List -->
+                <div class="md:col-span-1 bg-slate-50 flex flex-col h-full border-r border-slate-200">
+                    <div class="p-4 border-b bg-white flex justify-between items-center">
+                        <div>
+                            <h2 class="font-bold text-base text-gray-800 flex items-center gap-2">
+                                <i class="fa-solid fa-comments text-indigo-600"></i>
+                                <span>ข้อความสนทนา</span>
+                            </h2>
+                            <p class="text-[11px] text-gray-400">สนทนาส่วนตัวแบบ 1 ต่อ 1 กับคู่สัญญาของคุณ</p>
+                        </div>
+                        <span id="chat-list-count" class="text-xs bg-indigo-100 text-indigo-700 font-semibold px-2 py-0.5 rounded-full">0</span>
+                    </div>
+
+                    <!-- Search conversation in sidebar -->
+                    <div class="p-3 bg-slate-50 border-b">
+                        <div class="relative">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-gray-400"></i>
+                            <input type="text" id="chat-search-input" onkeyup="filterChatList()" placeholder="ค้นหาบทสนทนา..." class="w-full pl-8 pr-3 py-1.5 text-xs border rounded-xl bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+
+                    <!-- Conversations List Wrapper -->
+                    <div id="chat-sidebar-list" class="flex-grow overflow-y-auto chat-scroll divide-y divide-slate-100">
+                        <!-- Dynamic Conversation Items Rendered Here -->
+                    </div>
+                </div>
+
+                <!-- Right Main Panel: Active Chat Feed & Input Area -->
+                <div class="md:col-span-2 flex flex-col h-full bg-slate-100/50 relative">
+                    <!-- Active Chat Header -->
+                    <div id="chat-active-header" class="p-3 sm:p-4 bg-white border-b shadow-xs flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div id="active-chat-avatar" class="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm overflow-hidden">
+                                <i class="fa-solid fa-user"></i>
+                            </div>
+                            <div>
+                                <h3 id="active-chat-title" class="font-bold text-sm text-gray-800">กรุณาเลือกบทสนทนา</h3>
+                                <p id="active-chat-subtitle" class="text-xs text-gray-500">เลือกรายการทางซ้ายมือเพื่อเริ่มการสนทนา</p>
+                            </div>
+                        </div>
+
+                        <div id="active-chat-actions" class="hidden flex items-center space-x-2">
+                            <button onclick="viewPropertyFromChat()" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-xl font-medium transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-house-circle-info"></i>
+                                <span class="hidden sm:inline">ดูอสังหาฯ นี้</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Chat Messages Feed -->
+                    <div id="chat-messages-feed" class="flex-grow p-4 overflow-y-auto chat-scroll space-y-3">
+                        <div class="h-full flex flex-col items-center justify-center text-gray-400 text-center p-6">
+                            <i class="fa-solid fa-comments text-5xl text-slate-300 mb-3"></i>
+                            <p class="font-medium text-sm text-slate-500">ยังไม่มีการเลือกบทสนทนา</p>
+                            <p class="text-xs text-slate-400 mt-1 max-w-xs">คุณสามารถเลือกดูการสนทนาด้านซ้าย หรือกดปุ่ม "แชทกับเจ้าของบ้าน" บนหน้าประกาศที่พักได้ทันที</p>
+                        </div>
+                    </div>
+
+                    <!-- Chat Input Field Bar -->
+                    <div id="chat-input-container" class="p-3 bg-white border-t flex items-center space-x-2">
+                        <input type="text" id="chat-text-input" disabled onkeypress="handleChatKeyPress(event)" placeholder="พิมพ์ข้อความของคุณตรงนี้..." class="flex-grow border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 focus:bg-white transition">
+                        <button onclick="sendChatMessage()" id="chat-send-btn" disabled class="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white font-semibold text-sm px-5 py-2.5 rounded-xl transition flex items-center space-x-1.5 shadow-sm">
+                            <span>ส่ง</span>
+                            <i class="fa-solid fa-paper-plane text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. TENANT DASHBOARD SECTION -->
+        <section id="tenant-dashboard" class="hidden space-y-6">
+            <div class="border-b pb-4 flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">แดชบอร์ดผู้เช่า (Tenant Dashboard)</h1>
+                    <p class="text-sm text-gray-500">ติดตามสถานะคำขอเช่า และพูดคุยกับเจ้าของบ้าน</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div class="p-4 border-b bg-gray-50 font-semibold text-gray-700">รายการคำขอเช่าของคุณ</div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-gray-100 text-gray-600 border-b">
+                            <tr>
+                                <th class="p-4">ที่พัก</th>
+                                <th class="p-4">วันที่ย้ายเข้า</th>
+                                <th class="p-4">ข้อความถึงเจ้าของบ้าน</th>
+                                <th class="p-4">สถานะคำขอ</th>
+                                <th class="p-4 text-center">ช่องทางแชท</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tenant-request-list" class="divide-y">
+                            <!-- Dynamic Rental Requests -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. LANDLORD DASHBOARD SECTION -->
+        <section id="landlord-dashboard" class="hidden space-y-8">
+            <div class="border-b pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">แดชบอร์ดเจ้าของบ้าน (Landlord Dashboard)</h1>
+                    <p class="text-sm text-gray-500">จัดการเฉพาะอสังหาริมทรัพย์ที่คุณเป็นผู้ลงประกาศไว้เท่านั้น</p>
+                </div>
+                <button onclick="openAddPropertyModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-4 py-2.5 rounded-xl transition flex items-center space-x-2 shadow-sm">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>ลงประกาศเช่าที่พักใหม่</span>
+                </button>
+            </div>
+
+            <!-- Manage Incoming Rental Requests for Landlord's Properties -->
+            <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div class="p-4 border-b bg-indigo-50 text-indigo-900 font-semibold flex justify-between items-center">
+                    <span><i class="fa-solid fa-inbox mr-2"></i>คำขอเช่าที่เข้ามาสำหรับประกาศของคุณ</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-gray-100 text-gray-600 border-b">
+                            <tr>
+                                <th class="p-4">ผู้ขอเช่า</th>
+                                <th class="p-4">ที่พัก</th>
+                                <th class="p-4">วันที่ย้ายเข้า</th>
+                                <th class="p-4">ข้อความ</th>
+                                <th class="p-4">สถานะ</th>
+                                <th class="p-4 text-center">จัดการคำขอ / แชท</th>
+                            </tr>
+                        </thead>
+                        <tbody id="landlord-request-list" class="divide-y">
+                            <!-- Dynamic Requests for Landlord -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Manage Own Properties List Section -->
+            <div class="bg-white rounded-xl shadow-sm border p-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 pb-4 border-b">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-800 flex items-center space-x-2">
+                            <i class="fa-solid fa-house-circle-check text-indigo-600"></i>
+                            <span>จัดการรายการบ้านที่คุณลงประกาศไว้</span>
+                        </h2>
+                        <p class="text-xs text-gray-500 mt-0.5">คุณสามารถ เพิ่ม แก้ไขข้อมูล ลบ หรือเปิด/ปิดรับการเช่าประกาศของคุณได้ที่นี่</p>
+                    </div>
+                    <button onclick="openAddPropertyModal()" class="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white border border-indigo-200 px-3 py-2 rounded-lg font-semibold transition flex items-center space-x-1.5">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>ลงประกาศเพิ่ม</span>
+                    </button>
+                </div>
+                
+                <div id="landlord-property-list" class="space-y-4">
+                    <!-- Dynamic Managed Properties owned by current Landlord -->
+                </div>
+            </div>
+        </section>
+
+        <section id="admin-dashboard" class="hidden space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 border-b pb-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800"><i class="fa-solid fa-shield-halved text-rose-600 mr-2"></i>จัดการระบบ</h1>
+                    <p class="text-sm text-gray-500 mt-1">จัดการบัญชีผู้ใช้และประกาศที่พักทั้งหมด</p>
+                </div>
+                <button onclick="loadAdminDashboard()" class="bg-white border px-3 py-2 rounded-lg text-sm hover:bg-gray-50"><i class="fa-solid fa-rotate mr-1"></i>โหลดข้อมูลใหม่</button>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div class="p-4 border-b flex items-center justify-between"><h2 class="font-bold">เอกสารสิทธิ์ที่รอตรวจสอบ</h2><span id="admin-verification-count" class="text-sm text-gray-500"></span></div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm"><thead class="bg-gray-50 text-gray-500"><tr><th class="p-3 text-left">ประกาศ / ทำเล</th><th class="p-3 text-left">ผู้ลงประกาศ</th><th class="p-3 text-left">ประเภทเอกสาร</th><th class="p-3 text-left">ส่งเมื่อ</th><th class="p-3 text-right">ตรวจสอบ</th></tr></thead><tbody id="admin-verification-list" class="divide-y"><tr><td colspan="5" class="p-5 text-center text-gray-400">กำลังโหลด...</td></tr></tbody></table>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div class="p-4 border-b flex items-center justify-between"><h2 class="font-bold">บัญชีผู้ใช้</h2><span id="admin-user-count" class="text-sm text-gray-500"></span></div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm"><thead class="bg-gray-50 text-gray-500"><tr><th class="p-3 text-left">ชื่อ / อีเมล</th><th class="p-3 text-left">สมัครเมื่อ</th><th class="p-3 text-left">สถานะ</th><th class="p-3 text-right">จัดการ</th></tr></thead><tbody id="admin-user-list" class="divide-y"><tr><td colspan="4" class="p-5 text-center text-gray-400">กำลังโหลด...</td></tr></tbody></table>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div class="p-4 border-b flex items-center justify-between"><h2 class="font-bold">ประกาศที่พัก</h2><span id="admin-property-count" class="text-sm text-gray-500"></span></div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm"><thead class="bg-gray-50 text-gray-500"><tr><th class="p-3 text-left">ประกาศ</th><th class="p-3 text-left">เจ้าของ</th><th class="p-3 text-left">ราคา/เดือน</th><th class="p-3 text-left">สถานะ</th><th class="p-3 text-right">จัดการ</th></tr></thead><tbody id="admin-property-list" class="divide-y"><tr><td colspan="5" class="p-5 text-center text-gray-400">กำลังโหลด...</td></tr></tbody></table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t mt-auto py-6">
+        <div class="max-w-7xl mx-auto px-4 text-center text-sm text-gray-500">
+            &copy; 2026 RENTORA Platform. ระบบค้นหาและให้เช่าที่พักอาศัยพร้อมระบบส่งข้อความแชทส่วนตัว.
+        </div>
+    </footer>
+
+    <!-- MODALS SECTION -->
+
+    <!-- Modal 1: Login Modal -->
+    <div id="login-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+            <button onclick="closeModal('login-modal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <h3 class="text-xl font-bold text-gray-800 mb-4">เข้าสู่ระบบ RENTORA</h3>
+            
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">อีเมล *</label>
+                    <input type="email" id="login-email" required aria-describedby="login-error" placeholder="you@example.com" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">รหัสผ่าน</label>
+                    <div class="relative">
+                        <input type="password" id="login-password" required aria-describedby="login-error" autocomplete="current-password" placeholder="••••••••" class="w-full border rounded-lg pl-3 pr-10 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <button type="button" onclick="togglePasswordVisibility('login-password', this)" aria-label="แสดงรหัสผ่าน" aria-pressed="false" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600"><i class="fa-solid fa-eye"></i></button>
+                    </div>
+                    <p id="login-error" role="alert" aria-live="polite" class="hidden mt-2 text-xs font-medium text-red-600">อีเมลหรือรหัสผ่านไม่ถูกต้อง</p>
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-lg text-sm transition">เข้าสู่ระบบ</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 2: Register Modal -->
+    <div id="register-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+            <button onclick="closeModal('register-modal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <h3 class="text-xl font-bold text-gray-800 mb-4">สมัครสมาชิกใหม่</h3>
+            
+            <form onsubmit="handleRegister(event)" class="space-y-4">
+                <p class="text-sm text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg p-3">ทุกบัญชีสามารถค้นหาและเช่าที่พัก รวมถึงลงประกาศและจัดการที่พักได้</p>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">ชื่อ-นามสกุล</label>
+                    <input type="text" id="reg-name" required placeholder="สมชาย ใจดี" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">อีเมล</label>
+                    <input type="email" id="reg-email" required placeholder="user@example.com" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">รหัสผ่าน</label>
+                    <div class="relative">
+                        <input type="password" id="reg-password" minlength="8" required autocomplete="new-password" placeholder="อย่างน้อย 8 ตัวอักษร" class="w-full border rounded-lg pl-3 pr-10 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <button type="button" onclick="togglePasswordVisibility('reg-password', this)" aria-label="แสดงรหัสผ่าน" aria-pressed="false" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600"><i class="fa-solid fa-eye"></i></button>
+                    </div>
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-lg text-sm transition">ลงทะเบียน</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 3: Property Detail & Request Rent Modal -->
+    <div id="detail-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeModal('detail-modal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10"><i class="fa-solid fa-xmark text-xl"></i></button>
+            
+            <img id="modal-prop-img" src="" class="w-full h-56 object-cover rounded-xl mb-4">
+            
+            <div class="flex justify-between items-start mb-2">
+                <div>
+                    <span id="modal-prop-type" class="text-xs font-semibold bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full"></span>
+                    <h2 id="modal-prop-title" class="text-xl font-bold text-gray-800 mt-2"></h2>
+                    
+                    <div class="flex items-center space-x-2 mt-1">
+                        <p id="modal-prop-location" class="text-xs text-gray-500"><i class="fa-solid fa-location-dot mr-1 text-red-500"></i><span></span></p>
+                        <a id="modal-map-btn" href="#" target="_blank" class="inline-flex items-center text-xs text-indigo-600 font-medium hover:underline bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                            <i class="fa-solid fa-map-location-dot mr-1"></i> ดูบน Google Maps
+                        </a>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <span id="modal-prop-price" class="text-xl font-bold text-indigo-600"></span>
+                    <span class="text-xs text-gray-500">/เดือน</span>
+                </div>
+            </div>
+
+            <p id="modal-prop-desc" class="text-sm text-gray-600 my-4 border-t border-b py-3"></p>
+
+            <!-- ข้อมูลเจ้าของบ้านและช่องทางการติดต่อ + ปุ่มส่งข้อความแชท -->
+            <div class="bg-indigo-50/60 border border-indigo-100 rounded-xl p-4 my-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="flex items-center space-x-3">
+                    <div id="modal-owner-avatar" class="w-11 h-11 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-sm overflow-hidden flex-shrink-0">
+                        <i class="fa-solid fa-user-tie"></i>
+                    </div>
+                    <div>
+                        <p class="text-[11px] text-gray-500 font-medium">เจ้าของบ้าน / ผู้ดูแลที่พัก</p>
+                        <h4 id="modal-owner-name" class="font-bold text-sm text-gray-800"></h4>
+                    </div>
+                </div>
+                <div class="flex flex-wrap sm:flex-col gap-2 sm:gap-1 text-xs">
+                    <button onclick="startChatFromDetail()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-xl font-semibold transition flex items-center justify-center space-x-1.5 shadow-sm">
+                        <i class="fa-solid fa-comment-dots"></i>
+                        <span>ทักแชทสอบถามเจ้าของบ้าน</span>
+                    </button>
+                    <span id="modal-owner-phone" class="text-gray-700 font-medium flex items-center mt-1">
+                        <i class="fa-solid fa-phone text-emerald-600 mr-2"></i><span></span>
+                    </span>
+                    <span id="modal-owner-line" class="text-gray-700 font-medium flex items-center">
+                        <i class="fa-brands fa-line text-green-500 mr-2"></i><span></span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Request to Rent Form -->
+            <div class="bg-gray-50 p-4 rounded-xl border">
+                <h4 class="font-bold text-sm text-gray-800 mb-3"><i class="fa-solid fa-paper-plane text-indigo-600 mr-2"></i>ส่งคำขอเช่าที่พัก (Request to Rent)</h4>
+                <form onsubmit="handleRentRequest(event)" class="space-y-3">
+                    <input type="hidden" id="modal-prop-id">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">วันที่ต้องการย้ายเข้า</label>
+                        <input type="date" id="rent-movein-date" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">ข้อความถึงเจ้าของบ้าน</label>
+                        <textarea id="rent-message" rows="2" placeholder="แนะนำตัวสั้นๆ หรือสอบถามข้อมูลเพิ่มเติม..." class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-lg text-sm transition">ยืนยันการส่งคำขอเช่า</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 4: Add Property Modal -->
+    <div id="add-property-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeModal('add-property-modal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center space-x-2">
+                <i class="fa-solid fa-house-medical text-emerald-600"></i>
+                <span>ลงประกาศเช่าที่พักใหม่</span>
+            </h3>
+            
+            <form onsubmit="handleAddProperty(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">หัวข้อประกาศ / ชื่อที่พัก *</label>
+                    <input type="text" id="add-title" required placeholder="เช่น คอนโดมิเนียมหรู ติดรถไฟฟ้า BTS อโศก" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">ประเภทที่พัก *</label>
+                        <select id="add-type" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <option value="บ้าน">บ้านเดี่ยว / บ้านแฝด</option>
+                            <option value="คอนโด">คอนโดมิเนียม</option>
+                            <option value="ทาวน์โฮม">ทาวน์โฮม / ทาวน์เฮาส์</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">ราคาเช่า (บาท/เดือน) *</label>
+                        <input type="number" id="add-price" required placeholder="15000" min="0" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">ทำเล / พื้นที่ *</label>
+                    <input type="text" id="add-location" required placeholder="เช่น สงขลา, สุขุมวิท กรุงเทพฯ" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">
+                        <i class="fa-solid fa-map-pin text-red-500 mr-1"></i>ตำแหน่งใน Google Maps (ลิงก์ / พิกัด)
+                    </label>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <input type="url" id="add-map-url" placeholder="เช่น https://maps.app.goo.gl/..." class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <div class="flex gap-1 flex-shrink-0">
+                            <button type="button" onclick="openMapToPin('add')" title="เปิด Google Maps เพื่อค้นหา/เลือกตำแหน่ง" class="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 text-xs px-2.5 py-2 rounded-lg font-medium whitespace-nowrap flex items-center space-x-1 transition">
+                                <i class="fa-solid fa-map-location-dot"></i>
+                                <span>ปักหมุด</span>
+                            </button>
+                            <button type="button" onclick="getCurrentLocation('add')" title="ดึงพิกัด GPS ปัจจุบัน" class="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 text-xs px-2.5 py-2 rounded-lg font-medium whitespace-nowrap flex items-center space-x-1 transition">
+                                <i class="fa-solid fa-crosshairs"></i>
+                                <span>พิกัดปัจจุบัน</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border p-3 rounded-xl bg-gray-50 space-y-3">
+                    <label class="block text-xs font-semibold text-gray-700"><i class="fa-solid fa-address-book text-indigo-600 mr-1"></i>ข้อมูลผู้ติดต่อ / เจ้าของบ้าน</label>
+                    <div>
+                        <input type="text" id="add-owner-name" placeholder="ชื่อ-นามสกุล หรือ ชื่อเรียก" class="w-full bg-white border rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="tel" id="add-owner-phone" placeholder="เบอร์โทรศัพท์ที่ยืนยันแล้ว" readonly class="w-full bg-gray-100 border rounded-lg px-3 py-1.5 text-xs outline-none cursor-not-allowed">
+                        <input type="text" id="add-owner-line" placeholder="Line ID" class="w-full bg-white border rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                </div>
+
+                <div class="space-y-2 border p-3 rounded-xl bg-gray-50">
+                    <label class="block text-xs font-semibold text-gray-700">รูปภาพที่พัก</label>
+                    <input type="file" id="add-image-file" accept="image/*" onchange="handleFileSelect(event)" class="w-full text-xs text-gray-500 bg-white border rounded-lg p-1.5">
+                    <div class="text-center text-[10px] text-gray-400 font-bold uppercase">- หรือ -</div>
+                    <input type="url" id="add-image" placeholder="ระบุ URL รูปภาพ https://..." class="w-full bg-white border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <div id="image-preview-container" class="hidden mt-2 text-center border-t pt-2">
+                        <img id="image-preview" src="" class="h-28 mx-auto rounded-lg object-cover border shadow-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">รายละเอียดที่พัก *</label>
+                    <textarea id="add-desc" rows="3" required placeholder="ระบุสิ่งอำนวยความสะดวก..." class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                </div>
+
+                <p class="text-xs text-amber-700 bg-amber-50 rounded-lg p-2.5">ประกาศจะยังไม่แสดงบนหน้าเว็บจนกว่าจะส่งเอกสารและ Admin อนุมัติ</p>
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 rounded-lg text-sm transition">บันทึกประกาศเพื่อส่งตรวจ</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 5: Edit Property Modal -->
+    <div id="edit-property-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeModal('edit-property-modal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center space-x-2">
+                <i class="fa-solid fa-pen-to-square text-indigo-600"></i>
+                <span>แก้ไขข้อมูลประกาศที่พัก</span>
+            </h3>
+            
+            <form onsubmit="handleEditProperty(event)" class="space-y-4">
+                <input type="hidden" id="edit-prop-id">
+                
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">หัวข้อประกาศ / ชื่อที่พัก *</label>
+                    <input type="text" id="edit-title" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">ประเภทที่พัก *</label>
+                        <select id="edit-type" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <option value="บ้าน">บ้านเดี่ยว / บ้านแฝด</option>
+                            <option value="คอนโด">คอนโดมิเนียม</option>
+                            <option value="ทาวน์โฮม">ทาวน์โฮม / ทาวน์เฮาส์</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">ราคาเช่า (บาท/เดือน) *</label>
+                        <input type="number" id="edit-price" required min="0" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">ทำเล / พื้นที่ *</label>
+                    <input type="text" id="edit-location" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">
+                        <i class="fa-solid fa-map-pin text-red-500 mr-1"></i>ตำแหน่งใน Google Maps (ลิงก์ / พิกัด)
+                    </label>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <input type="url" id="edit-map-url" placeholder="เช่น https://maps.app.goo.gl/..." class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <div class="flex gap-1 flex-shrink-0">
+                            <button type="button" onclick="openMapToPin('edit')" class="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 text-xs px-2.5 py-2 rounded-lg font-medium whitespace-nowrap flex items-center space-x-1 transition">
+                                <i class="fa-solid fa-map-location-dot"></i>
+                                <span>ปักหมุด</span>
+                            </button>
+                            <button type="button" onclick="getCurrentLocation('edit')" class="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 text-xs px-2.5 py-2 rounded-lg font-medium whitespace-nowrap flex items-center space-x-1 transition">
+                                <i class="fa-solid fa-crosshairs"></i>
+                                <span>พิกัดปัจจุบัน</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border p-3 rounded-xl bg-gray-50 space-y-3">
+                    <label class="block text-xs font-semibold text-gray-700"><i class="fa-solid fa-address-book text-indigo-600 mr-1"></i>ข้อมูลผู้ติดต่อ / เจ้าของบ้าน</label>
+                    <div>
+                        <input type="text" id="edit-owner-name" class="w-full bg-white border rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="tel" id="edit-owner-phone" readonly class="w-full bg-gray-100 border rounded-lg px-3 py-1.5 text-xs outline-none cursor-not-allowed">
+                        <input type="text" id="edit-owner-line" class="w-full bg-white border rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                </div>
+
+                <div class="space-y-2 border p-3 rounded-xl bg-gray-50">
+                    <label class="block text-xs font-semibold text-gray-700">รูปภาพที่พัก</label>
+                    <input type="file" id="edit-image-file" accept="image/*" onchange="handleEditFileSelect(event)" class="w-full text-xs text-gray-500 bg-white border rounded-lg p-1.5">
+                    <div class="text-center text-[10px] text-gray-400 font-bold uppercase">- หรือ -</div>
+                    <input type="url" id="edit-image" class="w-full bg-white border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <div id="edit-image-preview-container" class="mt-2 text-center border-t pt-2">
+                        <img id="edit-image-preview" src="" class="h-28 mx-auto rounded-lg object-cover border shadow-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">รายละเอียดที่พัก *</label>
+                    <textarea id="edit-desc" rows="3" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" onclick="closeModal('edit-property-modal')" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition">ยกเลิก</button>
+                    <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-sm transition">บันทึกการแก้ไข</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="verification-document-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
+            <button onclick="closeModal('verification-document-modal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <h3 class="text-xl font-bold text-gray-800 mb-2">ส่งเอกสารยืนยันสิทธิ์ในที่พัก</h3>
+            <p class="text-sm text-gray-600 mb-4">เลือกเอกสารสิทธิ์ในทรัพย์สิน หรือหนังสือมอบอำนาจ เอกสารจะเก็บเป็นส่วนตัวและ Admin เท่านั้นที่เปิดตรวจได้</p>
+            <form onsubmit="submitVerificationDocument(event)" class="space-y-4">
+                <input type="hidden" id="verification-property-id">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">ประเภทหลักฐาน</label>
+                    <select id="verification-document-type" required class="w-full border rounded-lg px-3 py-2 text-sm">
+                        <option value="Ownership">เอกสารสิทธิ์ / หลักฐานการเป็นเจ้าของ</option>
+                        <option value="Authorization">หนังสือมอบอำนาจ / หนังสืออนุญาตให้ปล่อยเช่า</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">ไฟล์เอกสาร (PDF, JPG, PNG หรือ WebP, ไม่เกิน 10 MB)</label>
+                    <input type="file" id="verification-document-file" required accept="application/pdf,image/jpeg,image/png,image/webp" class="w-full border rounded-lg p-2 text-sm">
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg">ส่งให้ Admin ตรวจสอบ</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // --- APP STATE MANAGEMENT ---
+        let properties = [];
+        let requests = [];
+        let chats = [];
+        let currentUser = null;
+        let isAdmin = false;
+        let supabaseClient = null;
+        let realtimeChannel = null;
+        let activeChatId = null;
+        let pendingPhoneNumber = '';
+
+        let uploadedImageBase64 = '';
+        let uploadedEditImageBase64 = '';
+        let uploadedProfileAvatarBase64 = '';
+
+        async function refreshMarketplace() {
+            await loadUserData();
+            renderProperties(properties);
+            renderTenantDashboard();
+            renderLandlordDashboard();
+            renderChatSidebar();
+            updateUnreadBadge();
+        }
+
+        function subscribeToChatUpdates() {
+            if (realtimeChannel && supabaseClient) supabaseClient.removeChannel(realtimeChannel);
+            realtimeChannel = null;
+            if (!currentUser || !supabaseClient) return;
+            const userId = currentUser.id;
+            realtimeChannel = supabaseClient.channel(`rentora-chat-${userId}`)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, async payload => {
+                    if (currentUser?.id !== userId) return;
+                    const conversationId = payload.new?.conversation_id || payload.old?.conversation_id;
+                    if (!conversationId) return;
+                    try {
+                        await loadUserData();
+                        renderChatSidebar();
+                        updateUnreadBadge();
+                        const chat = chats.find(item => item.id === conversationId);
+                        if (chat && activeChatId === conversationId) renderMessagesFeed(chat);
+                    } catch (error) { console.error('Chat refresh failed', error); }
+                })
+                .subscribe();
+        }
+
+        async function persistImage(value, bucket) {
+            if (!value || !value.startsWith('data:image/')) return value || '';
+            const response = await fetch(value);
+            const blob = await response.blob();
+            const maxBytes = bucket === 'avatars' ? 2 * 1024 * 1024 : 5 * 1024 * 1024;
+            if (blob.size > maxBytes) throw new Error(`Image exceeds ${maxBytes / 1024 / 1024} MB.`);
+            const extension = ({ 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' })[blob.type];
+            if (!extension) throw new Error('Only JPEG, PNG, and WebP images are supported.');
+            const path = `${currentUser.id}/${crypto.randomUUID()}.${extension}`;
+            const { error } = await supabaseClient.storage.from(bucket).upload(path, blob, { contentType: blob.type, upsert: false });
+            if (error) throw error;
+            return supabaseClient.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+        }
+
+        function showDatabaseError(error, fallback = 'บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่') {
+            console.error(error);
+            showToast(fallback);
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[char]);
+        }
+
+        function safeImageUrl(value) {
+            const url = String(value || '');
+            if (/^https?:\/\//i.test(url) || /^data:image\/(png|jpeg|gif|webp);base64,/i.test(url)) return url;
+            return 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=600&q=80';
+        }
+
+        function jsStringArgument(value) {
+            return escapeHtml(JSON.stringify(String(value ?? '')));
+        }
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            ['login-email', 'login-password'].forEach(id => document.getElementById(id).addEventListener('input', clearLoginError));
+            updateAuthUI();
+            try {
+                const response = await fetch('/api/config');
+                if (!response.ok) throw new Error('ยังไม่ได้ตั้งค่า Supabase');
+                const config = await response.json();
+                if (!window.supabase?.createClient) throw new Error('โหลด Supabase SDK ไม่สำเร็จ');
+                supabaseClient = window.supabase.createClient(config.url, config.anonKey);
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                await applyAuthSession(session);
+                supabaseClient.auth.onAuthStateChange((_event, nextSession) => {
+                    applyAuthSession(nextSession).catch(error => console.error('Session refresh failed', error));
+                });
+            } catch (error) {
+                console.error(error);
+                renderProperties([]);
+                showToast('เชื่อมต่อระบบบัญชีไม่สำเร็จ กรุณาตั้งค่า Supabase ก่อน');
+            }
+        });
+
+        async function applyAuthSession(session) {
+            if (!supabaseClient) return;
+            if (!session?.user) {
+                currentUser = null;
+                isAdmin = false;
+                pendingPhoneNumber = '';
+                properties = await loadProperties();
+                requests = [];
+                chats = [];
+            } else {
+                const user = session.user;
+                const [{ data: profile, error: profileError }, { data: role, error: roleError }] = await Promise.all([
+                    supabaseClient.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+                    supabaseClient.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle()
+                ]);
+                if (profileError || roleError) throw profileError || roleError;
+                if (!profile || profile.suspended_at) {
+                    await supabaseClient.auth.signOut();
+                    showToast(profile?.suspended_at ? 'บัญชีนี้ถูกระงับการใช้งาน' : 'ไม่พบโปรไฟล์บัญชี กรุณาติดต่อผู้ดูแลระบบ');
+                    return;
+                }
+                currentUser = {
+                    id: user.id,
+                    email: user.email,
+                    name: profile?.full_name || user.user_metadata?.full_name || user.email.split('@')[0],
+                    phone: profile?.phone || '',
+                    verifiedPhone: user.phone_confirmed_at ? (user.phone || '') : '',
+                    phoneVerified: Boolean(user.phone && user.phone_confirmed_at),
+                    line: profile?.line_id || '',
+                    bio: profile?.bio || '',
+                    avatarUrl: profile?.avatar_url || '',
+                    avatarBg: profile?.avatar_color || 'bg-indigo-600',
+                    joinedDate: user.created_at ? new Date(user.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long' }) : '',
+                    role: 'Both'
+                };
+                isAdmin = Boolean(role);
+                await loadUserData();
+            }
+            subscribeToChatUpdates();
+            updateAuthUI();
+            renderPhoneVerificationState();
+            renderProperties(properties);
+            renderTenantDashboard();
+            renderLandlordDashboard();
+            updateUnreadBadge();
+        }
+
+        async function loadProperties() {
+            if (!supabaseClient) return [];
+            let query = supabaseClient.from('properties').select('*').eq('publication_status', 'Published').eq('status', 'Available').order('created_at', { ascending: false });
+            if (currentUser) query = supabaseClient.from('properties').select('*').or(`and(publication_status.eq.Published,status.eq.Available),owner_id.eq.${currentUser.id}`).order('created_at', { ascending: false });
+            const { data, error } = await query;
+            if (error) throw error;
+            return (data || []).map(fromDatabaseProperty);
+        }
+
+        function fromDatabaseProperty(row) {
+            return {
+                id: row.id, ownerId: row.owner_id, ownerEmail: row.owner_email, ownerName: row.owner_name,
+                ownerPhone: row.owner_phone, ownerLine: row.owner_line, ownerAvatarUrl: row.owner_avatar_url,
+                ownerAvatarBg: row.owner_avatar_color, title: row.title, type: row.type, price: Number(row.price),
+                location: row.location, mapUrl: row.map_url, image: row.image_url, description: row.description,
+                status: row.status, publicationStatus: row.publication_status, verificationStatus: row.verification_status,
+                verificationNote: row.verification_note || '', createdAt: row.created_at
+            };
+        }
+
+        async function loadUserData() {
+            properties = await loadProperties();
+            if (!currentUser) { requests = []; chats = []; return; }
+            const [{ data: requestRows, error: requestError }, { data: conversationRows, error: conversationError }] = await Promise.all([
+                supabaseClient.from('rental_requests').select('*').order('created_at', { ascending: false }),
+                supabaseClient.from('conversations').select('*, messages(*)').order('updated_at', { ascending: false })
+            ]);
+            if (requestError || conversationError) throw requestError || conversationError;
+            requests = (requestRows || []).map(row => ({
+                id: row.id, propertyId: row.property_id, tenantId: row.tenant_id, propertyTitle: row.property_title, tenantName: row.tenant_name,
+                tenantEmail: row.tenant_email, moveInDate: row.move_in_date, message: row.message, status: row.status
+            }));
+            chats = (conversationRows || []).map(row => ({
+                id: row.id, propertyId: row.property_id, tenantId: row.tenant_id, ownerId: row.owner_id, propertyTitle: row.property_title,
+                tenantEmail: row.tenant_email, tenantName: row.tenant_name, landlordEmail: row.owner_email,
+                landlordName: row.owner_name, unreadTenant: row.unread_tenant, unreadLandlord: row.unread_owner,
+                lastUpdated: row.updated_at,
+                messages: (row.messages || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map(message => ({
+                    senderEmail: message.sender_email, senderName: message.sender_name, text: message.body,
+                    timestamp: new Date(message.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
+                }))
+            }));
+        }
+
+        async function adminApi(path, options = {}) {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session?.access_token) throw new Error('กรุณาเข้าสู่ระบบใหม่อีกครั้ง');
+            const response = await fetch(path, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                    ...(options.headers || {})
+                }
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.error || 'ดำเนินการไม่สำเร็จ');
+            return result;
+        }
+
+        async function loadAdminDashboard() {
+            if (!currentUser || !isAdmin) return;
+            const userList = document.getElementById('admin-user-list');
+            const propertyList = document.getElementById('admin-property-list');
+            const verificationList = document.getElementById('admin-verification-list');
+            userList.innerHTML = '<tr><td colspan="4" class="p-5 text-center text-gray-400">กำลังโหลด...</td></tr>';
+            propertyList.innerHTML = '<tr><td colspan="5" class="p-5 text-center text-gray-400">กำลังโหลด...</td></tr>';
+            verificationList.innerHTML = '<tr><td colspan="5" class="p-5 text-center text-gray-400">กำลังโหลด...</td></tr>';
+            try {
+                let users = [];
+                for (let page = 1; page <= 100; page++) {
+                    const batch = await adminApi(`/api/admin/users?page=${page}&perPage=1000`);
+                    users.push(...batch);
+                    if (batch.length < 1000) break;
+                }
+                const [listings, verifications] = await Promise.all([
+                    adminApi('/api/admin/properties'), adminApi('/api/admin/verifications')
+                ]);
+                document.getElementById('admin-user-count').textContent = `${users.length} บัญชี`;
+                document.getElementById('admin-property-count').textContent = `${listings.length} ประกาศ`;
+                document.getElementById('admin-verification-count').textContent = `${verifications.length} รายการ`;
+                verificationList.innerHTML = verifications.map(item => {
+                    const documentType = item.documentType === 'Ownership' ? 'เอกสารสิทธิ์ / หลักฐานเจ้าของ' : 'หนังสือมอบอำนาจ / อนุญาตให้เช่า';
+                    const submittedAt = new Date(item.submittedAt).toLocaleString('th-TH');
+                    return `<tr>
+                        <td class="p-3"><div class="font-medium text-gray-800">${escapeHtml(item.title)}</div><div class="text-xs text-gray-500">${escapeHtml(item.location)}</div></td>
+                        <td class="p-3"><div class="text-gray-700">${escapeHtml(item.ownerName || '—')}</div><div class="text-xs text-gray-500">${escapeHtml(item.ownerEmail || '')}</div></td>
+                        <td class="p-3 text-gray-600">${documentType}</td>
+                        <td class="p-3 text-gray-600 whitespace-nowrap">${escapeHtml(submittedAt)}</td>
+                        <td class="p-3 text-right whitespace-nowrap">
+                            <button onclick="adminOpenVerificationDocument(${jsStringArgument(item.id)})" class="text-xs border border-indigo-200 text-indigo-700 rounded-lg px-2.5 py-1.5">เปิดเอกสาร</button>
+                            <button onclick="adminReviewVerification(${jsStringArgument(item.id)}, true)" class="text-xs bg-emerald-600 text-white rounded-lg px-2.5 py-1.5 ml-1">อนุมัติ</button>
+                            <button onclick="adminReviewVerification(${jsStringArgument(item.id)}, false)" class="text-xs bg-rose-600 text-white rounded-lg px-2.5 py-1.5 ml-1">ปฏิเสธ</button>
+                        </td>
+                    </tr>`;
+                }).join('') || '<tr><td colspan="5" class="p-5 text-center text-gray-400">ไม่มีเอกสารรอตรวจสอบ</td></tr>';
+                userList.innerHTML = users.map(user => {
+                    const status = user.suspended ? 'ระงับการใช้งาน' : user.emailConfirmed ? 'ใช้งานได้' : 'รอยืนยันอีเมล';
+                    const action = user.role === 'admin'
+                        ? '<span class="text-xs text-indigo-600 font-semibold">ผู้ดูแลระบบ</span>'
+                        : `<button onclick="adminSetUserSuspension(${jsStringArgument(user.id)}, ${!user.suspended})" class="text-xs border rounded-lg px-2.5 py-1.5 ${user.suspended ? 'text-emerald-700 border-emerald-200' : 'text-amber-700 border-amber-200'}">${user.suspended ? 'คืนสิทธิ์' : 'ระงับ'}</button>
+                           <button onclick="adminDeleteUser(${jsStringArgument(user.id)}, ${jsStringArgument(user.email || '')})" class="text-xs border border-red-200 text-red-600 rounded-lg px-2.5 py-1.5 ml-1">ลบบัญชี</button>`;
+                    return `<tr><td class="p-3"><div class="font-medium text-gray-800">${escapeHtml(user.name || '—')}</div><div class="text-xs text-gray-500">${escapeHtml(user.email || '')}</div></td><td class="p-3 text-gray-600">${escapeHtml(new Date(user.createdAt).toLocaleDateString('th-TH'))}</td><td class="p-3 text-gray-600">${status}</td><td class="p-3 text-right whitespace-nowrap">${action}</td></tr>`;
+                }).join('') || '<tr><td colspan="4" class="p-5 text-center text-gray-400">ยังไม่มีบัญชีผู้ใช้</td></tr>';
+                propertyList.innerHTML = listings.map(item => {
+                    const status = item.publication_status === 'PendingReview' ? 'รอตรวจเอกสาร'
+                        : item.publication_status === 'Rejected' ? 'เอกสารถูกปฏิเสธ'
+                        : item.status === 'Available' ? 'เผยแพร่ · เปิดเช่า'
+                        : item.status === 'Archived' ? 'เก็บถาวร' : 'เผยแพร่ · ปิดเช่า';
+                    const action = item.status === 'Archived'
+                        ? `<button onclick="adminSetPropertyStatus(${jsStringArgument(item.id)}, 'Available')" class="text-xs border border-emerald-200 text-emerald-700 rounded-lg px-2.5 py-1.5">กู้คืน</button>`
+                        : `<button onclick="adminSetPropertyStatus(${jsStringArgument(item.id)}, '${item.status === 'Available' ? 'Unavailable' : 'Available'}')" class="text-xs border rounded-lg px-2.5 py-1.5">${item.status === 'Available' ? 'ปิดเช่า' : 'เปิดเช่า'}</button>
+                           <button onclick="adminSetPropertyStatus(${jsStringArgument(item.id)}, 'Archived')" class="text-xs border border-amber-200 text-amber-700 rounded-lg px-2.5 py-1.5 ml-1">เก็บถาวร</button>`;
+                    return `<tr><td class="p-3"><div class="font-medium text-gray-800">${escapeHtml(item.title)}</div><div class="text-xs text-gray-500">${escapeHtml(item.type)} · ${escapeHtml(item.location)}</div></td><td class="p-3 text-gray-600">${escapeHtml(item.owner_name || item.owner_email || '—')}</td><td class="p-3 text-gray-600">฿${escapeHtml(Number(item.price).toLocaleString())}</td><td class="p-3 text-gray-600">${status}</td><td class="p-3 text-right whitespace-nowrap">${action}<button onclick="adminDeleteProperty(${jsStringArgument(item.id)}, ${jsStringArgument(item.title)})" class="text-xs border border-red-200 text-red-600 rounded-lg px-2.5 py-1.5 ml-1">ลบถาวร</button></td></tr>`;
+                }).join('') || '<tr><td colspan="5" class="p-5 text-center text-gray-400">ยังไม่มีประกาศ</td></tr>';
+            } catch (error) {
+                showDatabaseError(error, error.message || 'โหลดข้อมูลผู้ดูแลระบบไม่สำเร็จ');
+                userList.innerHTML = '<tr><td colspan="4" class="p-5 text-center text-red-500">โหลดข้อมูลไม่สำเร็จ</td></tr>';
+                propertyList.innerHTML = '<tr><td colspan="5" class="p-5 text-center text-red-500">โหลดข้อมูลไม่สำเร็จ</td></tr>';
+                verificationList.innerHTML = '<tr><td colspan="5" class="p-5 text-center text-red-500">โหลดข้อมูลไม่สำเร็จ</td></tr>';
+            }
+        }
+
+        async function adminOpenVerificationDocument(id) {
+            if (!currentUser || !isAdmin) return;
+            const documentWindow = window.open('about:blank', '_blank');
+            try {
+                const result = await adminApi(`/api/admin/verifications/${encodeURIComponent(id)}/document`);
+                if (!result.url) throw new Error('ไม่พบลิงก์เอกสาร');
+                if (documentWindow) {
+                    documentWindow.opener = null;
+                    documentWindow.location = result.url;
+                } else {
+                    window.location.assign(result.url);
+                }
+            } catch (error) {
+                if (documentWindow) documentWindow.close();
+                showDatabaseError(error, error.message || 'เปิดเอกสารไม่สำเร็จ');
+            }
+        }
+
+        async function adminReviewVerification(id, approve) {
+            if (!currentUser || !isAdmin) return;
+            const note = approve ? '' : prompt('ระบุเหตุผลที่ปฏิเสธเอกสาร เพื่อให้เจ้าของทราบและส่งใหม่ได้');
+            if (!approve && (note === null || !note.trim())) return;
+            try {
+                await adminApi(`/api/admin/verifications/${encodeURIComponent(id)}/review`, {
+                    method: 'PATCH', body: JSON.stringify({ approve, note: note || '' })
+                });
+                await loadAdminDashboard();
+                await refreshMarketplace();
+                showToast(approve ? 'อนุมัติเอกสารและเผยแพร่ประกาศแล้ว' : 'ปฏิเสธเอกสารแล้ว เจ้าของสามารถส่งใหม่ได้');
+            } catch (error) { showDatabaseError(error, error.message || 'บันทึกผลตรวจไม่สำเร็จ'); }
+        }
+
+        async function adminSetUserSuspension(id, suspended) {
+            if (!currentUser || !isAdmin) return;
+            try {
+                await adminApi(`/api/admin/users/${encodeURIComponent(id)}/suspension`, {
+                    method: 'PATCH', body: JSON.stringify({ suspended })
+                });
+                await loadAdminDashboard();
+                showToast(suspended ? 'ระงับบัญชีแล้ว' : 'คืนสิทธิ์บัญชีแล้ว');
+            } catch (error) { showDatabaseError(error, error.message); }
+        }
+
+        async function adminDeleteUser(id, email) {
+            if (!currentUser || !isAdmin) return;
+            if (prompt(`การลบบัญชี ${email} เป็นการลบถาวร พิมพ์ DELETE เพื่อยืนยัน`) !== 'DELETE') return;
+            try {
+                await adminApi(`/api/admin/users/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { 'x-confirm-delete': 'DELETE' } });
+                await loadAdminDashboard();
+                showToast('ลบบัญชีผู้ใช้แล้ว');
+            } catch (error) { showDatabaseError(error, error.message); }
+        }
+
+        async function adminSetPropertyStatus(id, status) {
+            if (!currentUser || !isAdmin) return;
+            try {
+                await adminApi(`/api/admin/properties/${encodeURIComponent(id)}/status`, {
+                    method: 'PATCH', body: JSON.stringify({ status })
+                });
+                await loadAdminDashboard();
+                await refreshMarketplace();
+                showToast('อัปเดตสถานะประกาศแล้ว');
+            } catch (error) { showDatabaseError(error, error.message); }
+        }
+
+        async function adminDeleteProperty(id, title) {
+            if (!currentUser || !isAdmin) return;
+            if (prompt(`การลบประกาศ "${title}" จะลบประวัติคำขอเช่าที่ผูกกับประกาศนี้ด้วย พิมพ์ DELETE เพื่อยืนยัน`) !== 'DELETE') return;
+            try {
+                await adminApi(`/api/admin/properties/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { 'x-confirm-delete': 'DELETE' } });
+                await loadAdminDashboard();
+                await refreshMarketplace();
+                showToast('ลบประกาศถาวรแล้ว');
+            } catch (error) { showDatabaseError(error, error.message); }
+        }
+
+        // Toast Helper
+        function showToast(text) {
+            const toast = document.getElementById('toast-message');
+            document.getElementById('toast-text').textContent = text;
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+        // --- HELPER FUNCTIONS FOR GOOGLE MAPS PINNING ---
+        function openMapToPin(mode) {
+            const locInputId = mode === 'add' ? 'add-location' : 'edit-location';
+            const locVal = document.getElementById(locInputId).value.trim();
+            const query = locVal ? encodeURIComponent(locVal) : '';
+            const targetUrl = query ? `https://www.google.com/maps/search/?api=1&query=${query}` : 'https://www.google.com/maps';
+            window.open(targetUrl, '_blank');
+        }
+
+        function getCurrentLocation(mode) {
+            const urlInputId = mode === 'add' ? 'add-map-url' : 'edit-map-url';
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        const mapLink = `https://maps.google.com/?q=${lat},${lng}`;
+                        document.getElementById(urlInputId).value = mapLink;
+                        showToast('ดึงพิกัดปัจจุบันสำเร็จเรียบร้อยแล้ว!');
+                    },
+                    () => {
+                        showToast('ไม่สามารถดึงตำแหน่งปัจจุบันได้ กรุณาเปิดอนุญาต GPS');
+                    }
+                );
+            } else {
+                showToast('เบราว์เซอร์ของคุณไม่รองรับการดึงตำแหน่ง Geolocation');
+            }
+        }
+
+        function showSection(sectionId) {
+            if ((sectionId === 'landlord-dashboard' || sectionId === 'tenant-dashboard') && !currentUser) {
+                showToast('กรุณาเข้าสู่ระบบก่อนใช้งานแดชบอร์ด');
+                openModal('login-modal');
+                return;
+            }
+            if (sectionId === 'profile-section' && !currentUser) {
+                showToast('กรุณาเข้าสู่ระบบก่อนดูข้อมูลโปรไฟล์');
+                openModal('login-modal');
+                return;
+            }
+            if (sectionId === 'admin-dashboard' && (!currentUser || !isAdmin)) {
+                showToast('คุณไม่มีสิทธิ์เข้าถึงหน้าผู้ดูแลระบบ');
+                return;
+            }
+            if (sectionId === 'chat-section' && !currentUser) {
+                showToast('กรุณาเข้าสู่ระบบก่อนใช้งานระบบกล่องข้อความ');
+                openModal('login-modal');
+                return;
+            }
+
+            document.getElementById('search-section').classList.add('hidden');
+            document.getElementById('tenant-dashboard').classList.add('hidden');
+            document.getElementById('landlord-dashboard').classList.add('hidden');
+            document.getElementById('admin-dashboard').classList.add('hidden');
+            document.getElementById('profile-section').classList.add('hidden');
+            document.getElementById('chat-section').classList.add('hidden');
+
+            document.getElementById(sectionId).classList.remove('hidden');
+
+            if (sectionId === 'profile-section') {
+                renderUserProfileSection();
+            } else if (sectionId === 'chat-section') {
+                renderChatSidebar();
+            } else if (sectionId === 'admin-dashboard') {
+                loadAdminDashboard();
+            }
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function openModal(modalId) { document.getElementById(modalId).classList.remove('hidden'); }
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+            if (modalId === 'login-modal') clearLoginError();
+        }
+
+        function setLoginError() {
+            const error = document.getElementById('login-error');
+            error.textContent = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+            error.classList.remove('hidden');
+            ['login-email', 'login-password'].forEach(id => {
+                const input = document.getElementById(id);
+                input.setAttribute('aria-invalid', 'true');
+                input.classList.add('border-red-500', 'ring-1', 'ring-red-500');
+            });
+        }
+
+        function clearLoginError() {
+            const error = document.getElementById('login-error');
+            if (error) error.classList.add('hidden');
+            ['login-email', 'login-password'].forEach(id => {
+                const input = document.getElementById(id);
+                if (!input) return;
+                input.removeAttribute('aria-invalid');
+                input.classList.remove('border-red-500', 'ring-1', 'ring-red-500');
+            });
+        }
+
+        function togglePasswordVisibility(inputId, button) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            const isVisible = input.type === 'text';
+            input.type = isVisible ? 'password' : 'text';
+            button.setAttribute('aria-pressed', String(!isVisible));
+            button.setAttribute('aria-label', isVisible ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน');
+            button.innerHTML = `<i class="fa-solid ${isVisible ? 'fa-eye' : 'fa-eye-slash'}"></i>`;
+        }
+
+        function updateAuthUI() {
+            const authButtons = document.getElementById('auth-buttons');
+            const userProfile = document.getElementById('user-profile');
+            const navTenant = document.getElementById('nav-tenant');
+            const navLandlord = document.getElementById('nav-landlord');
+            const navAddProperty = document.getElementById('nav-add-property');
+            const navChat = document.getElementById('nav-chat');
+            const navAdmin = document.getElementById('nav-admin');
+
+            if (currentUser) {
+                authButtons.classList.add('hidden');
+                userProfile.classList.remove('hidden');
+                userProfile.classList.add('flex');
+                navChat.classList.remove('hidden');
+                navChat.classList.add('flex');
+
+                const displayName = currentUser.name || currentUser.email.split('@')[0];
+                document.getElementById('user-display-name').textContent = displayName;
+                currentUser.role = 'Both';
+                document.getElementById('user-role-badge').textContent = 'ผู้เช่าและผู้ให้เช่า';
+
+                const initial = displayName.charAt(0).toUpperCase();
+                const avatarContainer = document.getElementById('header-avatar-container');
+                if (currentUser.avatarUrl) {
+                    avatarContainer.innerHTML = `<img src="${escapeHtml(safeImageUrl(currentUser.avatarUrl))}" class="w-full h-full object-cover">`;
+                } else {
+                    const bgClass = currentUser.avatarBg || 'bg-indigo-600';
+                    avatarContainer.className = `w-9 h-9 rounded-full ${bgClass} text-white flex items-center justify-center font-bold text-sm ring-2 ring-indigo-200 group-hover:ring-indigo-500 overflow-hidden shadow-sm`;
+                    avatarContainer.innerHTML = `<span id="header-avatar-initial">${escapeHtml(initial)}</span>`;
+                }
+
+                navLandlord.classList.remove('hidden');
+                navTenant.classList.remove('hidden');
+                navAddProperty.classList.remove('hidden');
+                navAdmin.classList.toggle('hidden', !isAdmin);
+            } else {
+                authButtons.classList.remove('hidden');
+                userProfile.classList.add('hidden');
+                userProfile.classList.remove('flex');
+                navTenant.classList.add('hidden');
+                navLandlord.classList.add('hidden');
+                navAddProperty.classList.add('hidden');
+                navChat.classList.add('hidden');
+                navAdmin.classList.add('hidden');
+            }
+
+            updateUnreadBadge();
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            if (!supabaseClient) { showToast('ยังเชื่อมต่อระบบบัญชีไม่ได้ กรุณาตั้งค่า Supabase'); return; }
+            const email = document.getElementById('login-email').value.trim().toLowerCase();
+            const password = document.getElementById('login-password').value;
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                if (error || !data.session) { setLoginError(); return; }
+                clearLoginError();
+                closeModal('login-modal');
+                await applyAuthSession(data.session);
+                showToast('ยินดีต้อนรับเข้าสู่ระบบ');
+                showSection('search-section');
+            } catch (error) { showDatabaseError(error, 'เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่'); }
+        }
+
+        async function handleRegister(event) {
+            event.preventDefault();
+            if (!supabaseClient) { showToast('ยังเชื่อมต่อระบบบัญชีไม่ได้ กรุณาตั้งค่า Supabase'); return; }
+            const name = document.getElementById('reg-name').value.trim();
+            const email = document.getElementById('reg-email').value.trim().toLowerCase();
+            const password = document.getElementById('reg-password').value;
+            try {
+                const { data, error } = await supabaseClient.auth.signUp({
+                    email, password,
+                    options: { data: { full_name: name }, emailRedirectTo: window.location.origin + window.location.pathname }
+                });
+                if (error) { showToast(error.message); return; }
+                closeModal('register-modal');
+                if (data.session) await applyAuthSession(data.session);
+                showToast('สมัครสมาชิกแล้ว กรุณายืนยันอีเมลจากลิงก์ที่ส่งให้ก่อนเข้าสู่ระบบ');
+            } catch (error) { showDatabaseError(error, 'สมัครสมาชิกไม่สำเร็จ กรุณาลองใหม่'); }
+        }
+
+        async function logout() {
+            if (supabaseClient) await supabaseClient.auth.signOut();
+            activeChatId = null;
+            await applyAuthSession(null);
+            showSection('search-section');
+            showToast('ออกจากระบบเรียบร้อยแล้ว');
+        }
+
+        // --- PRIVATE CHAT SYSTEM LOGIC ---
+
+        function updateUnreadBadge() {
+            const badge = document.getElementById('unread-chat-badge');
+            if (!currentUser || !badge) return;
+
+            let totalUnread = 0;
+            chats.forEach(c => {
+                if (c.tenantEmail === currentUser.email) {
+                    totalUnread += (c.unreadTenant || 0);
+                }
+                if (c.landlordEmail === currentUser.email) {
+                    totalUnread += (c.unreadLandlord || 0);
+                }
+            });
+
+            if (totalUnread > 0) {
+                badge.textContent = totalUnread > 99 ? '99+' : totalUnread;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        // Initiate or open chat with a specific Landlord
+        async function startChatWithLandlord(landlordEmail, propertyId) {
+            if (!currentUser) {
+                showToast('กรุณาเข้าสู่ระบบเพื่อเริ่มการแชท');
+                openModal('login-modal');
+                return;
+            }
+
+            if (currentUser.email === landlordEmail) {
+                showToast('คุณไม่สามารถส่งข้อความแชทถึงประกาศของตนเองได้');
+                return;
+            }
+
+            const prop = properties.find(p => p.id === propertyId);
+            if (!prop || !prop.ownerId) return showToast('ไม่พบประกาศหรือเจ้าของที่พัก');
+            try {
+                await openOrCreateConversation({
+                    propertyId, propertyTitle: prop.title, ownerId: prop.ownerId,
+                    ownerEmail: prop.ownerEmail, ownerName: prop.ownerName,
+                    tenantId: currentUser.id, tenantEmail: currentUser.email, tenantName: currentUser.name
+                });
+            } catch (error) { showDatabaseError(error, 'เริ่มแชทไม่สำเร็จ กรุณาลองใหม่'); }
+        }
+
+        async function startChatWithTenant(tenantId, propertyId) {
+            if (!currentUser || !tenantId) return showToast('ไม่พบข้อมูลผู้เช่าที่ติดต่อได้');
+            const prop = properties.find(p => p.id === propertyId);
+            const request = requests.find(r => r.propertyId === propertyId && r.tenantId === tenantId);
+            if (!prop || prop.ownerId !== currentUser.id || !request) return showToast('คุณไม่มีสิทธิ์เริ่มแชทนี้');
+            try {
+                await openOrCreateConversation({
+                    propertyId, propertyTitle: prop.title, ownerId: currentUser.id,
+                    ownerEmail: currentUser.email, ownerName: currentUser.name,
+                    tenantId, tenantEmail: request.tenantEmail, tenantName: request.tenantName
+                });
+            } catch (error) { showDatabaseError(error, 'เริ่มแชทไม่สำเร็จ กรุณาลองใหม่'); }
+        }
+
+        async function openOrCreateConversation(details) {
+            let { data: row, error } = await supabaseClient.from('conversations').select('*')
+                .eq('property_id', details.propertyId).eq('tenant_id', details.tenantId).maybeSingle();
+            if (error) throw error;
+            if (!row) {
+                const result = await supabaseClient.from('conversations').insert({
+                    property_id: details.propertyId, property_title: details.propertyTitle,
+                    tenant_id: details.tenantId, tenant_email: details.tenantEmail, tenant_name: details.tenantName,
+                    owner_id: details.ownerId, owner_email: details.ownerEmail, owner_name: details.ownerName
+                }).select('*').single();
+                if (result.error && result.error.code === '23505') {
+                    const retry = await supabaseClient.from('conversations').select('*')
+                        .eq('property_id', details.propertyId).eq('tenant_id', details.tenantId).single();
+                    if (retry.error) throw retry.error;
+                    row = retry.data;
+                } else if (result.error) throw result.error;
+                else row = result.data;
+                if (row) {
+                    const { error: messageError } = await supabaseClient.rpc('send_chat_message', {
+                        target_conversation_id: row.id,
+                        message_body: `สวัสดีครับ/ค่ะ สนใจสอบถามเกี่ยวกับที่พัก "${details.propertyTitle}"`
+                    });
+                    if (messageError) throw messageError;
+                }
+            }
+            await refreshMarketplace();
+            activeChatId = row.id;
+            showSection('chat-section');
+            openChatThread(row.id);
+        }
+
+        function startChatFromDetail() {
+            const propId = document.getElementById('modal-prop-id').value;
+            const prop = properties.find(p => p.id === propId);
+            if (prop) {
+                closeModal('detail-modal');
+                startChatWithLandlord(prop.ownerEmail, prop.id);
+            }
+        }
+
+        // Render Sidebar Conversation List (Strict Account Isolation Filter)
+        function renderChatSidebar(filterQuery = '') {
+            const container = document.getElementById('chat-sidebar-list');
+            const countBadge = document.getElementById('chat-list-count');
+            container.innerHTML = '';
+
+            if (!currentUser) return;
+
+            // Strictly filter chats where current logged-in user is either tenant or landlord
+            let userChats = chats.filter(c => c.tenantEmail === currentUser.email || c.landlordEmail === currentUser.email);
+
+            if (filterQuery) {
+                const q = filterQuery.toLowerCase();
+                userChats = userChats.filter(c => 
+                    c.propertyTitle.toLowerCase().includes(q) ||
+                    c.tenantName.toLowerCase().includes(q) ||
+                    c.landlordName.toLowerCase().includes(q)
+                );
+            }
+
+            countBadge.textContent = userChats.length;
+
+            if (userChats.length === 0) {
+                container.innerHTML = `
+                    <div class="p-8 text-center text-gray-400 text-xs">
+                        <i class="fa-solid fa-inbox text-3xl text-slate-300 mb-2"></i>
+                        <p>ไม่มีรายการการสนทนา</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Sort by most recent message
+            userChats.sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated));
+
+            userChats.forEach(c => {
+                const isTenant = currentUser.email === c.tenantEmail;
+                const partnerName = isTenant ? c.landlordName : c.tenantName;
+                const partnerRole = isTenant ? 'เจ้าของบ้าน' : 'ผู้เช่า';
+                const unreadCount = isTenant ? (c.unreadTenant || 0) : (c.unreadLandlord || 0);
+
+                const lastMsg = c.messages.length > 0 ? c.messages[c.messages.length - 1] : { text: '-', timestamp: '' };
+                const isActive = c.id === activeChatId;
+
+                const itemHtml = `
+                    <div onclick="openChatThread(${jsStringArgument(c.id)})" class="p-3.5 cursor-pointer transition flex items-start space-x-3 ${isActive ? 'bg-indigo-50/90 border-l-4 border-indigo-600' : 'hover:bg-slate-100 bg-white'}">
+                        <div class="w-10 h-10 rounded-full ${isTenant ? 'bg-indigo-600' : 'bg-emerald-600'} text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0 mt-0.5">
+                            ${escapeHtml(partnerName.charAt(0).toUpperCase())}
+                        </div>
+                        <div class="flex-grow min-w-0">
+                            <div class="flex justify-between items-baseline mb-0.5">
+                                <h4 class="font-bold text-xs text-gray-800 truncate">${escapeHtml(partnerName)}</h4>
+                                <span class="text-[10px] text-gray-400 flex-shrink-0 ml-1">${escapeHtml(lastMsg.timestamp || '')}</span>
+                            </div>
+                            <p class="text-[11px] font-medium text-indigo-600 truncate mb-1">
+                                <i class="fa-solid fa-house text-[10px] mr-1"></i>${escapeHtml(c.propertyTitle)}
+                            </p>
+                            <p class="text-xs text-gray-500 truncate ${unreadCount > 0 ? 'font-bold text-gray-900' : ''}">
+                                ${escapeHtml(lastMsg.text)}
+                            </p>
+                        </div>
+                        ${unreadCount > 0 ? `
+                            <div class="bg-rose-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow-xs flex-shrink-0">
+                                ${unreadCount}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', itemHtml);
+            });
+        }
+
+        function filterChatList() {
+            const q = document.getElementById('chat-search-input').value;
+            renderChatSidebar(q);
+        }
+
+        // Open Active Chat Thread
+        async function openChatThread(chatId) {
+            activeChatId = chatId;
+            const chat = chats.find(c => c.id === chatId);
+            if (!chat || !currentUser) return;
+
+            // Reset unread count for current user
+            if (currentUser.email === chat.tenantEmail) {
+                chat.unreadTenant = 0;
+            } else {
+                chat.unreadLandlord = 0;
+            }
+            const { error: readError } = await supabaseClient.rpc('mark_chat_read', { target_conversation_id: chatId });
+            if (readError) console.error('Could not mark the conversation as read', readError);
+            updateUnreadBadge();
+            renderChatSidebar();
+
+            const isTenant = currentUser.email === chat.tenantEmail;
+            const partnerName = isTenant ? chat.landlordName : chat.tenantName;
+            const partnerRole = isTenant ? 'เจ้าของบ้าน' : 'ผู้เช่า';
+
+            // Active Chat Header
+            document.getElementById('active-chat-title').textContent = partnerName;
+            document.getElementById('active-chat-subtitle').textContent = `สนทนาในฐานะ ${isTenant ? 'ผู้เช่า' : 'เจ้าของบ้าน'} • เกี่ยวกับ: ${chat.propertyTitle}`;
+            document.getElementById('active-chat-avatar').className = `w-10 h-10 rounded-full ${isTenant ? 'bg-indigo-600' : 'bg-emerald-600'} text-white flex items-center justify-center font-bold text-sm overflow-hidden`;
+            document.getElementById('active-chat-avatar').textContent = partnerName.charAt(0).toUpperCase();
+
+            document.getElementById('active-chat-actions').classList.remove('hidden');
+
+            // Enable inputs
+            document.getElementById('chat-text-input').disabled = false;
+            document.getElementById('chat-send-btn').disabled = false;
+
+            // Render Messages Feed
+            renderMessagesFeed(chat);
+        }
+
+        function renderMessagesFeed(chat) {
+            const feed = document.getElementById('chat-messages-feed');
+            feed.innerHTML = '';
+
+            if (!chat || chat.messages.length === 0) {
+                feed.innerHTML = `<div class="text-center text-gray-400 text-xs py-8">เริ่มส่งข้อความทักทายแรกกันเลย</div>`;
+                return;
+            }
+
+            chat.messages.forEach(m => {
+                const isMe = m.senderEmail === currentUser.email;
+
+                const msgBubble = `
+                    <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} my-1">
+                        <span class="text-[10px] text-gray-400 mb-0.5 px-1">${escapeHtml(m.senderName)}</span>
+                        <div class="flex items-end gap-1.5 max-w-[80%] sm:max-w-[70%]">
+                            ${isMe ? `<span class="text-[9px] text-gray-400 font-medium mb-0.5">${escapeHtml(m.timestamp)}</span>` : ''}
+                            <div class="px-4 py-2.5 rounded-2xl text-xs leading-relaxed shadow-xs ${isMe ? 'bg-indigo-600 text-white rounded-br-xs' : 'bg-white text-gray-800 border border-slate-200 rounded-bl-xs'}">
+                                ${escapeHtml(m.text)}
+                            </div>
+                            ${!isMe ? `<span class="text-[9px] text-gray-400 font-medium mb-0.5">${escapeHtml(m.timestamp)}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+                feed.insertAdjacentHTML('beforeend', msgBubble);
+            });
+
+            // Auto scroll to bottom
+            feed.scrollTop = feed.scrollHeight;
+        }
+
+        function handleChatKeyPress(e) {
+            if (e.key === 'Enter') {
+                sendChatMessage();
+            }
+        }
+
+        // Send Chat Message
+        async function sendChatMessage() {
+            const input = document.getElementById('chat-text-input');
+            const text = input.value.trim();
+            if (!text || text.length > 5000 || !activeChatId || !currentUser) return;
+
+            const chat = chats.find(c => c.id === activeChatId);
+            if (!chat) return;
+            try {
+                const { error } = await supabaseClient.rpc('send_chat_message', {
+                    target_conversation_id: chat.id, message_body: text
+                });
+                if (error) throw error;
+                input.value = '';
+                await refreshMarketplace();
+                openChatThread(chat.id);
+            } catch (error) { showDatabaseError(error, 'ส่งข้อความไม่สำเร็จ กรุณาลองใหม่'); }
+        }
+
+        function viewPropertyFromChat() {
+            if (!activeChatId) return;
+            const chat = chats.find(c => c.id === activeChatId);
+            if (chat && chat.propertyId) {
+                openPropertyDetail(chat.propertyId);
+            }
+        }
+
+        // --- PROFILE SECTION FUNCTIONS ---
+        function renderUserProfileSection() {
+            if (!currentUser) return;
+
+            const name = currentUser.name || currentUser.email.split('@')[0];
+            const initial = name.charAt(0).toUpperCase();
+
+            document.getElementById('profile-full-name').textContent = name;
+            document.getElementById('profile-email-text').textContent = currentUser.email;
+            document.getElementById('profile-role-badge').textContent = 'ผู้เช่าและผู้ให้เช่า';
+            document.getElementById('profile-joined-date').innerHTML = `<i class="fa-regular fa-calendar mr-1.5"></i>สมาชิกเมื่อ ${escapeHtml(currentUser.joinedDate || 'มกราคม 2026')}`;
+
+            const avatarLarge = document.getElementById('profile-avatar-large');
+            if (currentUser.avatarUrl) {
+                avatarLarge.innerHTML = `<img src="${escapeHtml(safeImageUrl(currentUser.avatarUrl))}" class="w-full h-full object-cover">`;
+            } else {
+                const bgClass = currentUser.avatarBg || 'bg-indigo-600';
+                avatarLarge.className = `w-24 h-24 rounded-2xl ${bgClass} text-white flex items-center justify-center font-bold text-3xl border-4 border-white/20 shadow-xl overflow-hidden`;
+                avatarLarge.innerHTML = `<span id="profile-initial-large">${escapeHtml(initial)}</span>`;
+            }
+
+            document.getElementById('prof-input-name').value = name;
+            document.getElementById('prof-input-email').value = currentUser.email;
+            document.getElementById('prof-input-phone').value = currentUser.phone || '';
+            renderPhoneVerificationState();
+            document.getElementById('prof-input-line').value = currentUser.line || '';
+            document.getElementById('prof-input-avatar').value = currentUser.avatarUrl || '';
+            document.getElementById('prof-input-bio').value = currentUser.bio || '';
+
+            const statsGrid = document.getElementById('profile-stats-grid');
+            if (currentUser.role === 'Tenant') {
+                const myReqs = requests.filter(r => r.tenantEmail === currentUser.email);
+                const approvedCount = myReqs.filter(r => r.status === 'Approved').length;
+                const myChats = chats.filter(c => c.tenantEmail === currentUser.email);
+
+                statsGrid.innerHTML = `
+                    <div class="bg-white p-5 rounded-2xl border shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs text-gray-500 font-medium">คำขอเช่าทั้งหมดของคุณ</p>
+                            <h3 class="text-2xl font-bold text-gray-800 mt-1">${myReqs.length} รายการ</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs text-gray-500 font-medium">คำขอที่ได้รับอนุมัติ</p>
+                            <h3 class="text-2xl font-bold text-emerald-600 mt-1">${approvedCount} รายการ</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs text-gray-500 font-medium">แชทกับเจ้าของบ้าน</p>
+                            <h3 class="text-2xl font-bold text-indigo-600 mt-1">${myChats.length} คู่สนทนา</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-comments"></i>
+                        </div>
+                    </div>
+                `;
+            } else {
+                const myProps = properties.filter(p => p.ownerEmail === currentUser.email);
+                const activeProps = myProps.filter(p => p.status === 'Available');
+                const myChats = chats.filter(c => c.landlordEmail === currentUser.email);
+
+                statsGrid.innerHTML = `
+                    <div class="bg-white p-5 rounded-2xl border shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs text-gray-500 font-medium">ที่พักที่คุณลงประกาศ</p>
+                            <h3 class="text-2xl font-bold text-gray-800 mt-1">${myProps.length} รายการ</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-building-user"></i>
+                        </div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs text-gray-500 font-medium">ประกาศที่เปิดพร้อมเช่า</p>
+                            <h3 class="text-2xl font-bold text-emerald-600 mt-1">${activeProps.length} รายการ</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-house-circle-check"></i>
+                        </div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs text-gray-500 font-medium">แชทจากผู้เช่า</p>
+                            <h3 class="text-2xl font-bold text-indigo-600 mt-1">${myChats.length} คู่สนทนา</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-comments"></i>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const myRentalRequests = requests.filter(r => r.tenantEmail === currentUser.email);
+            const approvedRentalRequests = myRentalRequests.filter(r => r.status === 'Approved').length;
+            statsGrid.insertAdjacentHTML('beforeend', `
+                <div class="bg-white p-5 rounded-2xl border shadow-sm flex items-center justify-between">
+                    <div><p class="text-xs text-gray-500 font-medium">คำขอเช่าของฉัน</p><h3 class="text-2xl font-bold text-gray-800 mt-1">${myRentalRequests.length} รายการ</h3></div>
+                    <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl"><i class="fa-solid fa-paper-plane"></i></div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border shadow-sm flex items-center justify-between">
+                    <div><p class="text-xs text-gray-500 font-medium">คำขอเช่าที่อนุมัติ</p><h3 class="text-2xl font-bold text-emerald-600 mt-1">${approvedRentalRequests} รายการ</h3></div>
+                    <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl"><i class="fa-solid fa-circle-check"></i></div>
+                </div>
+            `);
+
+            const roleActions = document.getElementById('profile-role-actions');
+            roleActions.innerHTML = `
+                    <button onclick="showSection('chat-section')" class="w-full bg-indigo-600 text-white hover:bg-indigo-700 font-semibold text-xs py-3 px-4 rounded-xl transition flex items-center justify-between mb-2 shadow-xs">
+                        <span class="flex items-center"><i class="fa-solid fa-comments mr-2"></i>เปิดกล่องข้อความส่วนตัว</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                    <button onclick="showSection('tenant-dashboard')" class="w-full bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-semibold text-xs py-2.5 px-4 rounded-xl transition flex items-center justify-between mb-2">
+                        <span class="flex items-center"><i class="fa-solid fa-list-check mr-2"></i>ติดตามคำขอเช่า</span>
+                        <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                    </button>
+                    <button onclick="showSection('landlord-dashboard')" class="w-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-semibold text-xs py-2.5 px-4 rounded-xl transition flex items-center justify-between mb-2">
+                        <span class="flex items-center"><i class="fa-solid fa-house-chimney-user mr-2"></i>ไปที่แดชบอร์ดจัดการบ้าน</span>
+                        <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                    </button>
+                    <button onclick="openAddPropertyModal()" class="w-full border border-emerald-200 text-emerald-700 hover:bg-emerald-50 font-semibold text-xs py-2.5 px-4 rounded-xl transition">ลงประกาศที่พัก</button>
+                `;
+        }
+
+        async function setAvatarPreset(bgClass) {
+            if (!currentUser) return;
+            try {
+                const { error } = await supabaseClient.from('profiles').update({
+                    avatar_color: bgClass, avatar_url: '', updated_at: new Date().toISOString()
+                }).eq('id', currentUser.id);
+                if (error) throw error;
+                uploadedProfileAvatarBase64 = '';
+                currentUser.avatarBg = bgClass;
+                currentUser.avatarUrl = '';
+                document.getElementById('prof-input-avatar').value = '';
+                const { error: listingError } = await supabaseClient.from('properties')
+                    .update({ owner_avatar_color: bgClass, owner_avatar_url: '' }).eq('owner_id', currentUser.id);
+                if (listingError) throw listingError;
+                await refreshMarketplace();
+                renderUserProfileSection();
+                updateAuthUI();
+            } catch (error) { showDatabaseError(error); }
+        }
+
+        function handleProfileFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    uploadedProfileAvatarBase64 = e.target.result;
+                    document.getElementById('prof-input-avatar').value = '';
+                    
+                    const avatarLarge = document.getElementById('profile-avatar-large');
+                    avatarLarge.className = "w-24 h-24 rounded-2xl border-4 border-white/20 shadow-xl overflow-hidden";
+                    avatarLarge.innerHTML = `<img src="${escapeHtml(safeImageUrl(uploadedProfileAvatarBase64))}" class="w-full h-full object-cover">`;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        async function handleSaveProfile(event) {
+            event.preventDefault();
+            if (!currentUser) return;
+
+            try {
+                const name = document.getElementById('prof-input-name').value.trim();
+                const phone = document.getElementById('prof-input-phone').value.trim();
+                const line = document.getElementById('prof-input-line').value.trim();
+                const bio = document.getElementById('prof-input-bio').value.trim();
+                const avatarInput = document.getElementById('prof-input-avatar').value.trim();
+                let avatarUrl = avatarInput || currentUser.avatarUrl || '';
+                if (uploadedProfileAvatarBase64) avatarUrl = await persistImage(uploadedProfileAvatarBase64, 'avatars');
+                const { error } = await supabaseClient.from('profiles').update({
+                    full_name: name, phone, line_id: line, bio, avatar_url: avatarUrl, updated_at: new Date().toISOString()
+                }).eq('id', currentUser.id);
+                if (error) throw error;
+                const listingUpdates = { owner_name: name, owner_line: line || '-', owner_avatar_url: avatarUrl };
+                if (currentUser.phoneVerified) listingUpdates.owner_phone = currentUser.verifiedPhone;
+                const { error: listingError } = await supabaseClient.from('properties').update(listingUpdates).eq('owner_id', currentUser.id);
+                if (listingError) throw listingError;
+                currentUser = { ...currentUser, name, phone, line, bio, avatarUrl };
+                uploadedProfileAvatarBase64 = '';
+                updateAuthUI();
+                await refreshMarketplace();
+                renderUserProfileSection();
+                showToast('บันทึกข้อมูลโปรไฟล์สำเร็จเรียบร้อย!');
+            } catch (error) { showDatabaseError(error); }
+        }
+
+        function normalizePhoneNumber(value) {
+            let phone = String(value || '').trim().replace(/[\s()-]/g, '');
+            if (/^0\d{8,9}$/.test(phone)) phone = `+66${phone.slice(1)}`;
+            else if (/^66\d{8,9}$/.test(phone)) phone = `+${phone}`;
+            else if (/^\d{8,15}$/.test(phone)) phone = `+${phone}`;
+            return /^\+[1-9]\d{7,14}$/.test(phone) ? phone : '';
+        }
+
+        function renderPhoneVerificationState() {
+            const status = document.getElementById('phone-verification-status');
+            const input = document.getElementById('verify-phone-input');
+            const panel = document.getElementById('phone-otp-panel');
+            const help = document.getElementById('phone-verification-help');
+            if (!status || !input || !panel || !help) return;
+            if (currentUser?.phoneVerified) {
+                input.value = currentUser.verifiedPhone || '';
+                input.readOnly = true;
+                status.textContent = 'ยืนยันแล้ว';
+                status.className = 'text-xs font-semibold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full';
+                panel.classList.add('hidden');
+                help.textContent = 'ใช้เบอร์ที่ยืนยันนี้เป็นเบอร์ติดต่อในประกาศของคุณ';
+            } else {
+                input.readOnly = false;
+                if (pendingPhoneNumber) input.value = pendingPhoneNumber;
+                status.textContent = 'ยังไม่ยืนยัน';
+                status.className = 'text-xs font-semibold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full';
+                panel.classList.toggle('hidden', !pendingPhoneNumber);
+                if (!pendingPhoneNumber) help.textContent = 'กรอกรหัสประเทศได้ เช่น +66';
+            }
+        }
+
+        async function requestPhoneVerification() {
+            if (!currentUser || !supabaseClient) return;
+            if (currentUser.phoneVerified) {
+                showToast('เบอร์โทรศัพท์นี้ยืนยันแล้ว');
+                return;
+            }
+            const phone = normalizePhoneNumber(document.getElementById('verify-phone-input').value);
+            if (!phone) {
+                showToast('กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง พร้อมรหัสประเทศ');
+                return;
+            }
+            try {
+                const { error } = await supabaseClient.auth.updateUser({ phone });
+                if (error) throw error;
+                pendingPhoneNumber = phone;
+                renderPhoneVerificationState();
+                document.getElementById('phone-verification-help').textContent = `ส่งรหัสยืนยันไปที่ ${phone} แล้ว`;
+                document.getElementById('verify-phone-code').focus();
+                showToast('ส่งรหัส SMS แล้ว');
+            } catch (error) {
+                showDatabaseError(error, error.message || 'ส่งรหัส SMS ไม่สำเร็จ กรุณาลองใหม่');
+            }
+        }
+
+        async function confirmPhoneVerification() {
+            if (!currentUser || !pendingPhoneNumber || !supabaseClient) return;
+            const token = document.getElementById('verify-phone-code').value.trim();
+            if (!token) {
+                showToast('กรุณากรอกรหัส OTP');
+                return;
+            }
+            try {
+                const { data, error } = await supabaseClient.auth.verifyOtp({
+                    phone: pendingPhoneNumber, token, type: 'phone_change'
+                });
+                if (error) throw error;
+                pendingPhoneNumber = '';
+                document.getElementById('verify-phone-code').value = '';
+                const session = data.session || (await supabaseClient.auth.getSession()).data.session;
+                await applyAuthSession(session);
+                showToast('ยืนยันเบอร์โทรศัพท์เรียบร้อยแล้ว');
+            } catch (error) {
+                showDatabaseError(error, error.message || 'รหัส OTP ไม่ถูกต้องหรือหมดอายุ');
+            }
+        }
+
+        async function handleChangePassword(event) {
+            event.preventDefault();
+            if (!currentUser) return;
+            const oldPassword = document.getElementById('current-password').value;
+            const newPassword = document.getElementById('new-password').value;
+            try {
+                const { error: verifyError } = await supabaseClient.auth.signInWithPassword({ email: currentUser.email, password: oldPassword });
+                if (verifyError) {
+                    showToast('รหัสผ่านปัจจุบันไม่ถูกต้อง');
+                    return;
+                }
+                const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+                if (error) throw error;
+                event.target.reset();
+                showToast('เปลี่ยนรหัสผ่านเรียบร้อยแล้ว');
+            } catch (error) {
+                showDatabaseError(error, 'ไม่สามารถเปลี่ยนรหัสผ่านได้ในขณะนี้');
+            }
+        }
+
+        // --- PROPERTY MANAGEMENT LOGIC ---
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    uploadedImageBase64 = e.target.result;
+                    document.getElementById('image-preview').src = uploadedImageBase64;
+                    document.getElementById('image-preview-container').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function handleEditFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    uploadedEditImageBase64 = e.target.result;
+                    document.getElementById('edit-image-preview').src = uploadedEditImageBase64;
+                    document.getElementById('edit-image-preview-container').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function openAddPropertyModal() {
+            if (!currentUser) {
+                showToast('กรุณาเข้าสู่ระบบก่อนลงประกาศ');
+                openModal('login-modal');
+                return;
+            }
+            if (!currentUser.phoneVerified) {
+                showToast('กรุณายืนยันเบอร์โทรศัพท์ก่อนลงประกาศ');
+                showSection('profile-section');
+                document.getElementById('verify-phone-input')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+            document.getElementById('add-owner-name').value = currentUser.name || '';
+            document.getElementById('add-owner-phone').value = currentUser.verifiedPhone || '';
+            document.getElementById('add-owner-line').value = currentUser.line || '';
+            openModal('add-property-modal');
+        }
+
+        async function handleAddProperty(event) {
+            event.preventDefault();
+            if (!currentUser) {
+                showToast('กรุณาเข้าสู่ระบบก่อนลงประกาศ');
+                openModal('login-modal');
+                return;
+            }
+            if (!currentUser.phoneVerified) {
+                showToast('กรุณายืนยันเบอร์โทรศัพท์ก่อนลงประกาศ');
+                closeModal('add-property-modal');
+                showSection('profile-section');
+                return;
+            }
+            const title = document.getElementById('add-title').value;
+            const type = document.getElementById('add-type').value;
+            const price = parseFloat(document.getElementById('add-price').value);
+            const location = document.getElementById('add-location').value;
+            const mapUrl = document.getElementById('add-map-url').value.trim();
+
+            const ownerName = document.getElementById('add-owner-name').value.trim() || currentUser.name;
+            const ownerPhone = currentUser.verifiedPhone;
+            const ownerLine = document.getElementById('add-owner-line').value.trim() || '-';
+
+            let image = uploadedImageBase64 || document.getElementById('add-image').value.trim();
+            if (!image) image = 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=600&q=80';
+
+            try {
+                image = await persistImage(image, 'property-images');
+                const { data: listing, error } = await supabaseClient.from('properties').insert({
+                    owner_id: currentUser.id, owner_email: currentUser.email, owner_name: ownerName,
+                    owner_phone: ownerPhone, owner_line: ownerLine, owner_avatar_url: currentUser.avatarUrl || '',
+                    owner_avatar_color: currentUser.avatarBg || 'bg-indigo-600', title, type, price, location,
+                    map_url: mapUrl, image_url: image, description: document.getElementById('add-desc').value,
+                    status: 'Available'
+                }).select('id').single();
+                if (error) throw error;
+                uploadedImageBase64 = '';
+                document.getElementById('image-preview-container').classList.add('hidden');
+                closeModal('add-property-modal');
+                event.target.reset();
+                await refreshMarketplace();
+                showSection('landlord-dashboard');
+                showToast('บันทึกประกาศแล้ว ขั้นตอนถัดไปส่งเอกสารให้ Admin ตรวจ');
+                openVerificationModal(listing.id);
+            } catch (error) { showDatabaseError(error); }
+        }
+
+        function openVerificationModal(propertyId) {
+            const prop = properties.find(item => item.id === propertyId);
+            if (!currentUser || !currentUser.phoneVerified) {
+                showToast('กรุณายืนยันเบอร์โทรศัพท์ก่อนส่งเอกสาร');
+                showSection('profile-section');
+                return;
+            }
+            if (prop && (prop.ownerId !== currentUser.id || prop.publicationStatus === 'Published')) {
+                showToast('ประกาศนี้ไม่ต้องส่งเอกสารตรวจสอบ');
+                return;
+            }
+            document.getElementById('verification-property-id').value = propertyId;
+            document.getElementById('verification-document-file').value = '';
+            openModal('verification-document-modal');
+        }
+
+        async function submitVerificationDocument(event) {
+            event.preventDefault();
+            if (!currentUser || !currentUser.phoneVerified) {
+                showToast('กรุณายืนยันเบอร์โทรศัพท์ก่อนส่งเอกสาร');
+                return;
+            }
+            const propertyId = document.getElementById('verification-property-id').value;
+            const file = document.getElementById('verification-document-file').files?.[0];
+            const type = document.getElementById('verification-document-type').value;
+            const extensions = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+            if (!file || !extensions[file.type] || file.size > 10 * 1024 * 1024) {
+                showToast('เลือกไฟล์ PDF, JPG, PNG หรือ WebP ขนาดไม่เกิน 10 MB');
+                return;
+            }
+            const path = `${currentUser.id}/${propertyId}/${crypto.randomUUID()}.${extensions[file.type]}`;
+            let uploaded = false;
+            try {
+                const { error: uploadError } = await supabaseClient.storage.from('verification-documents').upload(path, file, {
+                    contentType: file.type, upsert: false
+                });
+                if (uploadError) throw uploadError;
+                uploaded = true;
+                const { error } = await supabaseClient.from('property_verifications').insert({
+                    property_id: propertyId, submitted_by: currentUser.id, document_type: type, document_path: path
+                });
+                if (error) throw error;
+                closeModal('verification-document-modal');
+                event.target.reset();
+                await refreshMarketplace();
+                showToast('ส่งเอกสารแล้ว ประกาศจะรอ Admin ตรวจสอบ');
+            } catch (error) {
+                if (uploaded) await supabaseClient.storage.from('verification-documents').remove([path]).catch(() => {});
+                showDatabaseError(error, error.message || 'ส่งเอกสารไม่สำเร็จ กรุณาลองใหม่');
+            }
+        }
+
+        function openEditPropertyModal(id) {
+            const prop = properties.find(p => p.id === id);
+            if (!prop) return;
+
+            if (!currentUser || prop.ownerEmail !== currentUser.email) {
+                showToast('คุณไม่มีสิทธิ์แก้ไขประกาศนี้');
+                return;
+            }
+
+            document.getElementById('edit-prop-id').value = prop.id;
+            document.getElementById('edit-title').value = prop.title;
+            document.getElementById('edit-type').value = prop.type;
+            document.getElementById('edit-price').value = prop.price;
+            document.getElementById('edit-location').value = prop.location;
+            document.getElementById('edit-map-url').value = prop.mapUrl || '';
+            document.getElementById('edit-owner-name').value = prop.ownerName || '';
+            document.getElementById('edit-owner-phone').value = currentUser?.verifiedPhone || prop.ownerPhone || '';
+            document.getElementById('edit-owner-line').value = prop.ownerLine || '';
+            document.getElementById('edit-image').value = prop.image.startsWith('data:image') ? '' : prop.image;
+            document.getElementById('edit-desc').value = prop.description;
+            
+            uploadedEditImageBase64 = prop.image.startsWith('data:image') ? prop.image : '';
+            if (prop.image) {
+                document.getElementById('edit-image-preview').src = safeImageUrl(prop.image);
+                document.getElementById('edit-image-preview-container').classList.remove('hidden');
+            }
+
+            openModal('edit-property-modal');
+        }
+
+        async function handleEditProperty(event) {
+            event.preventDefault();
+            const id = document.getElementById('edit-prop-id').value;
+            const propIndex = properties.findIndex(p => p.id === id);
+            if (propIndex === -1) return;
+
+            if (!currentUser || properties[propIndex].ownerEmail !== currentUser.email) {
+                showToast('คุณไม่มีสิทธิ์แก้ไขประกาศนี้');
+                return;
+            }
+
+            let image = uploadedEditImageBase64 || document.getElementById('edit-image').value.trim();
+            if (!image) image = properties[propIndex].image;
+
+            try {
+                image = await persistImage(image, 'property-images');
+                const updates = {
+                    title: document.getElementById('edit-title').value,
+                    type: document.getElementById('edit-type').value,
+                    price: parseFloat(document.getElementById('edit-price').value),
+                    location: document.getElementById('edit-location').value,
+                    map_url: document.getElementById('edit-map-url').value.trim(),
+                    owner_name: document.getElementById('edit-owner-name').value,
+                    owner_line: document.getElementById('edit-owner-line').value,
+                    image_url: image, description: document.getElementById('edit-desc').value,
+                    updated_at: new Date().toISOString()
+                };
+                if (currentUser.phoneVerified) updates.owner_phone = currentUser.verifiedPhone;
+                const { error } = await supabaseClient.from('properties').update(updates).eq('id', id).eq('owner_id', currentUser.id);
+                if (error) throw error;
+                uploadedEditImageBase64 = '';
+                await refreshMarketplace();
+                closeModal('edit-property-modal');
+                showToast('แก้ไขประกาศแล้ว ต้องส่งเอกสารให้ Admin ตรวจใหม่ก่อนเผยแพร่');
+            } catch (error) { showDatabaseError(error); }
+        }
+
+        async function deleteProperty(id) {
+            const prop = properties.find(p => p.id === id);
+            if (!prop || !currentUser || prop.ownerEmail !== currentUser.email) {
+                showToast('คุณไม่มีสิทธิ์ลบประกาศนี้');
+                return;
+            }
+            try {
+                const { error } = await supabaseClient.from('properties')
+                    .update({ status: 'Archived', updated_at: new Date().toISOString() })
+                    .eq('id', id).eq('owner_id', currentUser.id);
+                if (error) throw error;
+                await refreshMarketplace();
+                showToast('เก็บประกาศถาวรแล้ว ประวัติคำขอและแชทยังคงอยู่');
+            } catch (error) { showDatabaseError(error); }
+        }
+
+        async function togglePropertyStatus(id) {
+            const prop = properties.find(p => p.id === id);
+            if (!prop || !currentUser || prop.ownerEmail !== currentUser.email) return;
+            try {
+                const status = prop.status === 'Archived' || prop.status === 'Unavailable' ? 'Available' : 'Unavailable';
+                const { error } = await supabaseClient.from('properties').update({ status, updated_at: new Date().toISOString() })
+                    .eq('id', id).eq('owner_id', currentUser.id);
+                if (error) throw error;
+                await refreshMarketplace();
+            } catch (error) { showDatabaseError(error); }
+        }
+
+        function renderProperties(items) {
+            const grid = document.getElementById('property-grid');
+            const countText = document.getElementById('property-count');
+            grid.innerHTML = '';
+
+            const availableItems = items.filter(p => p.status === 'Available' && p.publicationStatus === 'Published');
+            countText.textContent = `พบ ${availableItems.length} รายการ`;
+
+            if (availableItems.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center py-12 text-gray-500">ไม่พบที่พักที่พร้อมเช่าในขณะนี้</div>`;
+                return;
+            }
+
+            availableItems.forEach(prop => {
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-2xl shadow-sm border hover:shadow-md transition overflow-hidden flex flex-col';
+                card.innerHTML = `
+                    <div class="relative">
+                        <img src="${escapeHtml(safeImageUrl(prop.image))}" alt="${escapeHtml(prop.title)}" class="w-full h-48 object-cover">
+                        <div class="absolute top-3 left-3 flex flex-wrap gap-1.5">
+                            <span class="text-xs font-semibold bg-white/90 backdrop-blur-md text-indigo-700 px-3 py-1 rounded-full shadow-xs">${escapeHtml(prop.type)}</span>
+                            <span class="text-[10px] font-semibold bg-emerald-100/95 text-emerald-800 px-2.5 py-1 rounded-full shadow-xs"><i class="fa-solid fa-circle-check mr-1"></i>ตรวจเอกสารแล้ว</span>
+                        </div>
+                    </div>
+                    <div class="p-4 flex-grow flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-center mb-1.5">
+                                <span class="text-xs text-gray-500"><i class="fa-solid fa-location-dot mr-1 text-red-500"></i>${escapeHtml(prop.location)}</span>
+                            </div>
+                            <h3 class="font-bold text-gray-800 text-base line-clamp-1">${escapeHtml(prop.title)}</h3>
+                            <p class="text-xs text-gray-500 mt-1 line-clamp-2">${escapeHtml(prop.description)}</p>
+                        </div>
+
+                        <div class="mt-4 pt-3 border-t flex items-center justify-between gap-2">
+                            <div>
+                                <span class="text-lg font-bold text-indigo-600">฿${escapeHtml(Number(prop.price).toLocaleString())}</span>
+                                <span class="text-xs text-gray-500">/เดือน</span>
+                            </div>
+                            <div class="flex items-center space-x-1.5">
+                                <button onclick="startChatWithLandlord(${jsStringArgument(prop.ownerEmail)}, ${jsStringArgument(prop.id)})" title="ส่งข้อความแชทถึงเจ้าของบ้าน" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200 text-xs p-2 rounded-xl transition">
+                                    <i class="fa-solid fa-comments text-sm"></i>
+                                </button>
+                                <button onclick="openPropertyDetail(${jsStringArgument(prop.id)})" class="text-xs font-medium bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-xl transition shadow-xs">
+                                    ดูรายละเอียด
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function applyFilters() {
+            const loc = document.getElementById('filter-location').value.toLowerCase();
+            const type = document.getElementById('filter-type').value;
+            const minPriceValue = document.getElementById('filter-min-price').value;
+            const maxPriceValue = document.getElementById('filter-max-price').value;
+            const minPrice = minPriceValue === '' ? null : Number(minPriceValue);
+            const maxPrice = maxPriceValue === '' ? null : Number(maxPriceValue);
+            if (minPrice !== null && maxPrice !== null && minPrice > maxPrice) {
+                showToast('ราคาขั้นต่ำต้องไม่สูงกว่าราคาสูงสุด');
+                return;
+            }
+
+            const filtered = properties.filter(p => {
+                const matchLoc = p.location.toLowerCase().includes(loc) || p.title.toLowerCase().includes(loc);
+                const matchType = type === '' || p.type === type;
+                const matchMinPrice = minPrice === null || p.price >= minPrice;
+                const matchMaxPrice = maxPrice === null || p.price <= maxPrice;
+                return matchLoc && matchType && matchMinPrice && matchMaxPrice;
+            });
+            renderProperties(filtered);
+        }
+
+        function openPropertyDetail(id) {
+            const prop = properties.find(p => p.id === id);
+            if (!prop) return;
+
+            document.getElementById('modal-prop-id').value = prop.id;
+            document.getElementById('modal-prop-img').src = safeImageUrl(prop.image);
+            document.getElementById('modal-prop-title').textContent = prop.title;
+            document.getElementById('modal-prop-type').textContent = prop.type;
+            document.getElementById('modal-prop-location').querySelector('span').textContent = prop.location;
+            document.getElementById('modal-prop-price').textContent = `฿${prop.price.toLocaleString()}`;
+            document.getElementById('modal-prop-desc').textContent = prop.description;
+
+            const mapBtn = document.getElementById('modal-map-btn');
+            const mapUrl = prop.mapUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(prop.location)}`;
+            mapBtn.href = /^https?:\/\//i.test(mapUrl) ? mapUrl : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(prop.location)}`;
+
+            let ownerName = prop.ownerName || 'เจ้าของบ้าน';
+            let ownerPhone = prop.ownerPhone || '-';
+            let ownerLine = prop.ownerLine || '-';
+            let ownerAvatarUrl = prop.ownerAvatarUrl || '';
+            let ownerAvatarBg = prop.ownerAvatarBg || 'bg-indigo-600';
+
+            if (currentUser && currentUser.email === prop.ownerEmail) {
+                ownerName = currentUser.name || ownerName;
+                ownerPhone = currentUser.phone || ownerPhone;
+                ownerLine = currentUser.line || ownerLine;
+                ownerAvatarUrl = currentUser.avatarUrl || ownerAvatarUrl;
+                ownerAvatarBg = currentUser.avatarBg || ownerAvatarBg;
+            }
+
+            document.getElementById('modal-owner-name').textContent = ownerName;
+            document.getElementById('modal-owner-phone').querySelector('span').textContent = ownerPhone;
+            document.getElementById('modal-owner-line').querySelector('span').textContent = ownerLine;
+
+            const avatarContainer = document.getElementById('modal-owner-avatar');
+            if (avatarContainer) {
+                if (ownerAvatarUrl) {
+                    avatarContainer.className = "w-11 h-11 rounded-full shadow-sm overflow-hidden flex-shrink-0";
+                    avatarContainer.innerHTML = `<img src="${escapeHtml(safeImageUrl(ownerAvatarUrl))}" class="w-full h-full object-cover">`;
+                } else {
+                    const initial = ownerName.charAt(0).toUpperCase();
+                    avatarContainer.className = `w-11 h-11 rounded-full ${ownerAvatarBg} text-white flex items-center justify-center font-bold text-lg shadow-sm flex-shrink-0`;
+                    avatarContainer.innerHTML = `<span>${escapeHtml(initial)}</span>`;
+                }
+            }
+
+            openModal('detail-modal');
+        }
+
+        async function handleRentRequest(event) {
+            event.preventDefault();
+            if (!currentUser) {
+                showToast('กรุณาเข้าสู่ระบบก่อนทำการส่งคำขอเช่า');
+                openModal('login-modal');
+                return;
+            }
+
+            const propId = document.getElementById('modal-prop-id').value;
+            const prop = properties.find(p => p.id === propId);
+            if (!prop || prop.status !== 'Available') {
+                showToast('ที่พักนี้ไม่พร้อมให้เช่าแล้ว');
+                closeModal('detail-modal');
+                return;
+            }
+            if (prop.ownerEmail === currentUser.email) {
+                showToast('คุณไม่สามารถส่งคำขอเช่าที่พักของตัวเองได้');
+                return;
+            }
+            if (requests.some(r => r.propertyId === propId && r.tenantEmail === currentUser.email && r.status === 'Pending')) {
+                showToast('คุณมีคำขอที่รอพิจารณาสำหรับที่พักนี้อยู่แล้ว');
+                return;
+            }
+
+            try {
+                const { error } = await supabaseClient.from('rental_requests').insert({
+                    property_id: propId, tenant_id: currentUser.id, tenant_email: currentUser.email,
+                    tenant_name: currentUser.name, property_title: prop.title,
+                    move_in_date: document.getElementById('rent-movein-date').value,
+                    message: document.getElementById('rent-message').value, status: 'Pending'
+                });
+                if (error) throw error;
+                await refreshMarketplace();
+                closeModal('detail-modal');
+                showToast('ส่งคำขอเช่าเรียบร้อยแล้ว!');
+            } catch (error) { showDatabaseError(error, 'ส่งคำขอเช่าไม่สำเร็จ อาจมีคำขอที่รอพิจารณาอยู่แล้ว'); }
+        }
+
+        function renderTenantDashboard() {
+            const tbody = document.getElementById('tenant-request-list');
+            tbody.innerHTML = '';
+            const userReqs = currentUser ? requests.filter(r => r.tenantEmail === currentUser.email) : [];
+
+            if (userReqs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-500">คุณยังไม่มีรายการคำขอเช่า</td></tr>`;
+                return;
+            }
+
+            userReqs.forEach(r => {
+                let statusBadge = r.status === 'Pending' ? `<span class="bg-yellow-100 text-yellow-800 text-xs px-2.5 py-1 rounded-full font-medium">รอการอนุมัติ</span>`
+                    : r.status === 'Approved' ? `<span class="bg-green-100 text-green-800 text-xs px-2.5 py-1 rounded-full font-medium">อนุมัติแล้ว</span>`
+                    : `<span class="bg-red-100 text-red-800 text-xs px-2.5 py-1 rounded-full font-medium">ปฏิเสธแล้ว</span>`;
+
+                const prop = properties.find(p => p.id === r.propertyId);
+                const landlordEmail = prop ? prop.ownerEmail : '';
+
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50';
+                tr.innerHTML = `
+                    <td class="p-4 font-medium text-gray-800">${escapeHtml(r.propertyTitle)}</td>
+                    <td class="p-4 text-gray-600">${escapeHtml(r.moveInDate)}</td>
+                    <td class="p-4 text-gray-600">${escapeHtml(r.message || '-')}</td>
+                    <td class="p-4">${statusBadge}</td>
+                    <td class="p-4 text-center">
+                        <button onclick="startChatWithLandlord(${jsStringArgument(landlordEmail)}, ${jsStringArgument(r.propertyId)})" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200 text-xs px-3 py-1.5 rounded-xl font-medium transition flex items-center justify-center space-x-1 mx-auto">
+                            <i class="fa-solid fa-comments"></i>
+                            <span>แชทถามเจ้าของ</span>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderLandlordDashboard() {
+            if (!currentUser) return;
+
+            const myProperties = properties.filter(p => p.ownerEmail === currentUser.email);
+            const myPropertyIds = myProperties.map(p => p.id);
+            const myRequests = requests.filter(r => myPropertyIds.includes(r.propertyId));
+
+            const reqTbody = document.getElementById('landlord-request-list');
+            reqTbody.innerHTML = '';
+
+            if (myRequests.length === 0) {
+                reqTbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-gray-500">ยังไม่มีคำขอเช่าสำหรับอสังหาริมทรัพย์ของคุณ</td></tr>`;
+            } else {
+                myRequests.forEach(r => {
+                    let statusBadge = r.status === 'Pending' ? `<span class="bg-yellow-100 text-yellow-800 text-xs px-2.5 py-1 rounded-full font-medium">รอดำเนินการ</span>`
+                        : r.status === 'Approved' ? `<span class="bg-green-100 text-green-800 text-xs px-2.5 py-1 rounded-full font-medium">อนุมัติแล้ว</span>`
+                        : `<span class="bg-red-100 text-red-800 text-xs px-2.5 py-1 rounded-full font-medium">ปฏิเสธแล้ว</span>`;
+
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-gray-50';
+                    tr.innerHTML = `
+                        <td class="p-4 font-medium text-gray-800">${escapeHtml(r.tenantName)}<br><span class="text-xs text-gray-400">${escapeHtml(r.tenantEmail)}</span></td>
+                        <td class="p-4 text-gray-700">${escapeHtml(r.propertyTitle)}</td>
+                        <td class="p-4 text-gray-600">${escapeHtml(r.moveInDate)}</td>
+                        <td class="p-4 text-gray-600">${escapeHtml(r.message || '-')}</td>
+                        <td class="p-4">${statusBadge}</td>
+                        <td class="p-4 text-center">
+                            <div class="flex items-center justify-center space-x-1.5">
+                                ${r.status === 'Pending' ? `
+                                    <button onclick="updateRequestStatus(${jsStringArgument(r.id)}, 'Approved')" class="bg-green-600 hover:bg-green-700 text-white text-xs px-2.5 py-1.5 rounded-lg transition">อนุมัติ</button>
+                                    <button onclick="updateRequestStatus(${jsStringArgument(r.id)}, 'Rejected')" class="bg-red-600 hover:bg-red-700 text-white text-xs px-2.5 py-1.5 rounded-lg transition">ปฏิเสธ</button>
+                                ` : ''}
+                                <button onclick="startChatWithTenant(${jsStringArgument(r.tenantId)}, ${jsStringArgument(r.propertyId)})" title="แชทกับผู้เช่าท่านนี้" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200 text-xs px-2.5 py-1.5 rounded-lg transition">
+                                    <i class="fa-solid fa-comments"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    reqTbody.appendChild(tr);
+                });
+            }
+
+            const propContainer = document.getElementById('landlord-property-list');
+            propContainer.innerHTML = '';
+
+            if (myProperties.length === 0) {
+                propContainer.innerHTML = `<div class="text-center py-10 bg-gray-50 rounded-xl border border-dashed text-gray-500">คุณยังไม่ได้ลงประกาศที่พักใดๆ</div>`;
+                return;
+            }
+
+            myProperties.forEach(p => {
+                const item = document.createElement('div');
+                item.className = 'border rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50 hover:bg-white hover:shadow-md transition';
+                
+                const isAvailable = p.status === 'Available';
+                const isArchived = p.status === 'Archived';
+                const statusBadge = isArchived
+                    ? `<span class="bg-rose-100 text-rose-800 text-[11px] font-semibold px-2.5 py-0.5 rounded-full">เก็บถาวร</span>`
+                    : isAvailable
+                    ? `<span class="bg-emerald-100 text-emerald-800 text-[11px] font-semibold px-2.5 py-0.5 rounded-full">พร้อมเช่า</span>`
+                    : `<span class="bg-gray-200 text-gray-700 text-[11px] font-semibold px-2.5 py-0.5 rounded-full">ปิดการเช่า</span>`;
+                const verificationBadge = p.publicationStatus === 'Published'
+                    ? `<span class="bg-emerald-100 text-emerald-800 text-[11px] font-semibold px-2.5 py-0.5 rounded-full">ตรวจเอกสารแล้ว</span>`
+                    : p.publicationStatus === 'Rejected'
+                    ? `<span class="bg-rose-100 text-rose-800 text-[11px] font-semibold px-2.5 py-0.5 rounded-full">เอกสารถูกปฏิเสธ</span>`
+                    : `<span class="bg-amber-100 text-amber-800 text-[11px] font-semibold px-2.5 py-0.5 rounded-full">รอตรวจสอบ</span>`;
+                const verificationNote = p.verificationNote
+                    ? `<p class="text-xs text-rose-700 mt-1">หมายเหตุจาก Admin: ${escapeHtml(p.verificationNote)}</p>`
+                    : '';
+
+                item.innerHTML = `
+                    <div class="flex items-center space-x-3 w-full sm:w-auto">
+                        <img src="${escapeHtml(safeImageUrl(p.image))}" class="w-20 h-20 object-cover rounded-xl flex-shrink-0">
+                        <div>
+                            <div class="flex items-center space-x-2 mb-1">
+                                ${statusBadge}
+                                ${verificationBadge}
+                                <span class="text-xs font-semibold text-indigo-600">${escapeHtml(p.type)}</span>
+                            </div>
+                            <h4 class="font-bold text-sm text-gray-800 line-clamp-1">${escapeHtml(p.title)}</h4>
+                            <p class="text-xs text-gray-500"><i class="fa-solid fa-location-dot mr-1"></i>${escapeHtml(p.location)}</p>
+                            <p class="text-xs font-bold text-indigo-600 mt-1">฿${escapeHtml(Number(p.price).toLocaleString())}/เดือน</p>
+                            ${verificationNote}
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-2 sm:pt-0">
+                        <button onclick="togglePropertyStatus(${jsStringArgument(p.id)})" class="text-xs ${isAvailable ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'} border px-3 py-1.5 rounded-xl font-medium transition">
+                            ${isArchived ? 'กู้คืนประกาศ' : isAvailable ? 'ปิดการเช่า' : 'เปิดการเช่า'}
+                        </button>
+                        <button onclick="openEditPropertyModal(${jsStringArgument(p.id)})" ${isArchived ? 'disabled' : ''} class="text-xs bg-indigo-50 text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-xl font-medium transition ${isArchived ? 'opacity-40 cursor-not-allowed' : ''}">
+                            แก้ไข
+                        </button>
+                        ${p.publicationStatus !== 'Published' && !isArchived ? `<button onclick="openVerificationModal(${jsStringArgument(p.id)})" class="text-xs bg-amber-50 text-amber-800 border border-amber-200 px-3 py-1.5 rounded-xl font-medium transition">${p.publicationStatus === 'Rejected' ? 'ส่งเอกสารใหม่' : 'ส่งเอกสารตรวจ'}</button>` : ''}
+                        <button onclick="deleteProperty(${jsStringArgument(p.id)})" ${isArchived ? 'disabled' : ''} class="text-xs bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-xl font-medium transition ${isArchived ? 'opacity-40 cursor-not-allowed' : ''}">
+                            เก็บถาวร
+                        </button>
+                    </div>
+                `;
+                propContainer.appendChild(item);
+            });
+        }
+
+        async function updateRequestStatus(reqId, status) {
+            const req = requests.find(r => r.id === reqId);
+            const prop = req && properties.find(p => p.id === req.propertyId);
+            if (!req || !prop || !currentUser || prop.ownerEmail !== currentUser.email || req.status !== 'Pending') return;
+            if (!['Approved', 'Rejected'].includes(status)) return;
+            if (status === 'Approved' && req.tenantEmail === currentUser.email) {
+                showToast('ไม่สามารถอนุมัติคำขอเช่าของบัญชีตัวเองได้');
+                return;
+            }
+            try {
+                if (status === 'Approved') {
+                    const { error } = await supabaseClient.rpc('approve_rental_request', { target_request_id: reqId });
+                    if (error) throw error;
+                } else {
+                    const { error } = await supabaseClient.from('rental_requests')
+                        .update({ status: 'Rejected', updated_at: new Date().toISOString() }).eq('id', reqId);
+                    if (error) throw error;
+                }
+                await refreshMarketplace();
+                showToast(`อัปเดตสถานะคำขอเรียบร้อยแล้ว (${status === 'Approved' ? 'อนุมัติ' : 'ปฏิเสธ'})`);
+            } catch (error) { showDatabaseError(error, 'อัปเดตคำขอไม่สำเร็จ ที่พักอาจไม่พร้อมให้เช่าแล้ว'); }
+        }
+    </script>
+</body>
+</html>
